@@ -4,6 +4,7 @@
 !app.sample.py
 !config.py
 !config.sample.yaml
+!google_drive.py
 !helpers.py
 !kavita.py
 !plex_rematch.py

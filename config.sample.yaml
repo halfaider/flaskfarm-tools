@@ -83,11 +83,24 @@ plex:
   #retry: 10
   #countdown: 5
 
+google:
+  scopes:
+    - drive.readonly
+    - drive.activity.readonly
+  token:
+    client_id: xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+    client_secret: xxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    refresh_token: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  #cache_enable: false
+  #cache_ttl: 300 # seconds
+  #cache_maxsize: 256 # each
+
+
 logging:
   level: debug
-  #format: '%(asctime)s|%(levelname)8s| %(message)s <%(filename)s:%(lineno)d#%(funcName)s>'
+  #format: '%(asctime)s|%(levelname)8s| %(message)s | %(filename)s:%(lineno)d#%(funcName)s'
   format: '%(asctime)s|%(levelname)8s| %(message)s'
-  date_format: '%Y-%m-%d %H:%M:%S'
+  date_format: '%Y-%m-%dT%H:%M:%S'
   redacted_patterns:
     - "apikey=(.{10,36})"
     - "['\"]apikey['\"]: ['\"](.{10,36})['\"]"

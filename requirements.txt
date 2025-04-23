@@ -2,3 +2,6 @@ aiohttp
 pyyaml
 psutil
 guessit
+google-auth-httplib2
+google-api-python-client
+google-auth

@@ -205,3 +205,15 @@ def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
             return result
         return wrapper
     return decorator
+
+
+def apply_cache(func: Callable, maxsize: int = 64) -> Callable:
+    @functools.lru_cache(maxsize=maxsize)
+    def wrapper(*args: Any, ttl_hash: int = 3600, **kwds: Any):
+        del ttl_hash
+        return func(*args, **kwds)
+    return wrapper
+
+
+def get_ttl_hash(seconds: int = 3600) -> int:
+    return round(time.time() / seconds)

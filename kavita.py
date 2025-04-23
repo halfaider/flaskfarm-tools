@@ -2,7 +2,7 @@ import asyncio
 import logging
 import urllib.parse
 import sqlite3
-from typing import Any, Generator
+from typing import Any, Generator, Sequence
 
 from config import kavita as config
 from helpers import http_api, retrieve_db
@@ -39,6 +39,14 @@ def fetch_one(query: str, con: sqlite3.Connection) -> dict:
 def fetch_all(query: str, con: sqlite3.Connection) -> Generator[dict, None, None]:
     for row in con.execute(query):
         yield row
+
+
+@retrieve_db
+def execute(query: str, con: sqlite3.Connection, params: Sequence[str] = None) -> None:
+    if params:
+        con.execute(query, *params)
+    else:
+        con.execute(query)
 
 
 async def main(*args: Any, **kwds: Any) -> None:

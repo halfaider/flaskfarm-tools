@@ -24,7 +24,7 @@ async def main(*args: Any, **kwds: Any) -> None:
     포스터 파일이 삭제되어 포스터 표시가 안 되는 메타데이터 중 포스터 url 정보가 있으면 url로 대체
     URL이 없을 경우 영화와 쇼는 새로고침, 에피소드는 분석
     모든 섹션을 지정하려면 -1 입력"""
-    #await plex_update_metamedia.update_metamedia(-1)
+    #await plex_update_metamedia.update_metamedia(1)
 
     """
     - "title" column 값이 정확히 "인터스텔라"인 데이터:
@@ -70,7 +70,7 @@ async def main(*args: Any, **kwds: Any) -> None:
     #plex.update_review_source()
 
     """
-    DB 쿼리 실행
+    Plex DB 쿼리 실행
     조회는 fectch_all() 혹은 fetch_one() 사용
     DB 수정은 execte(), execute_batch(), execute_gen() 사용
     connection을 직접 다룰 경우 @plex.retrieve_db 데코레이터 사용"""
@@ -105,6 +105,27 @@ async def main(*args: Any, **kwds: Any) -> None:
     #        result = await plex.refresh(row['id'])
     #        await plex.check_update(row['id'], result, start)
     #await refresh_season()
+
+    """
+    Google Drive 파일 검색
+    https://developers.google.com/workspace/drive/api/guides/search-files?hl=ko"""
+    #from google_drive import google_drive
+    #query = "name contains '런닝맨' and name contains '240218'"
+    #result = google_drive.get_files(query)
+    #print(result)
+    #file = result.get('files')[0]
+    #result = google_drive.get_file(file['id'])
+    #print(result)
+
+    """
+    Kavita
+    """
+    #import kavita
+    #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가')
+
+    #rows = kavita.fetch_all('SELECT * FROM series LIMIT 10')
+    #for row in rows:
+    #    print(row)
 
 
 if __name__ == "__main__":

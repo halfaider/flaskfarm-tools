@@ -95,7 +95,6 @@ class _PlexConfig:
 
 @dataclasses.dataclass
 class PlexConfig(_BaseConfig, _PlexConfig):
-
     def __post_init__(self) -> None:
         if not self.url or not self.token:
             raise Exception('url 또는 token 값이 없습니다.')
@@ -119,15 +118,41 @@ class PlexConfig(_BaseConfig, _PlexConfig):
 class _KavitaConfig:
     url: str
     apikey: str
-    db: str
+    db: str = None
 
 
 @dataclasses.dataclass
 class KavitaConfig(_BaseConfig, _KavitaConfig):
-
     def __post_init__(self) -> None:
         if not self.url or not self.apikey:
             raise Exception('url 또는 apikey 값이 없습니다.')
+
+
+@dataclasses.dataclass
+class _GoogleConfig:
+    scopes: Sequence[str]
+    token: Mapping[str, str]
+    cache_enable: bool = False
+    cache_ttl: int = 300
+    cache_maxsize: int = 256
+
+
+@dataclasses.dataclass
+class GoogleConfig(_BaseConfig, _GoogleConfig):
+    def __post_init__(self) -> None:
+        if not self.scopes:
+            raise Exception('scope 값이 없습니다.')
+        scopes = []
+        for scope in self.scopes:
+            if 'http' in scope:
+                scopes.append(scope)
+            else:
+                scopes.append(f'https://www.googleapis.com/auth/{scope}')
+        self.scopes = tuple(scopes)
+        if not self.token:
+            raise Exception('token 값이 없습니다.')
+        if not self.token.get('client_id') or not self.token.get('client_secret') or not self.token.get('refresh_token'):
+            raise Exception('client_id, client_secret, refresh_token 값을 확인해 주세요.')
 
 
 yaml_config = None
