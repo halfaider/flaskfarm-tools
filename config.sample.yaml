@@ -1,19 +1,19 @@
+# default 설정은 각 앱의 기본 값으로 사용되고 앱 설정 값이 있을 경우 앱 설정 값을 사용합니다.
 default:
-  # default 설정은 각 앱의 기본 값으로 사용되고 앱 설정 값이 있을 경우 앱 설정 값을 사용합니다.
-  dry_run: False
-  #mappings:
+  dry_run: true # true | false (true일 경우 목록만 출력)
+  #mappings: # 경로 매핑
   #  /GDRIVE: /mnt/gds2/GDRIVE
-  #headers:
+  #headers: # http 요청 헤더
   #  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36
-  #workers: 2
-  #batch_size: 100
-  #retry: 10
-  #countdown: 5
+  #workers: 2 # 동시 작업 수
+  #batch_size: 100 # DB 업데이트 실행시 한번에 실행할 쿼리문의 최대 갯수 (1: 쿼리문 1개씩 실행, 100: 100개씩 실행)
+  #retry: 10 # 재시도 횟수
+  #countdown: 5 # 지연용 카운트다운
 
 kavita:
   url: http://kavita:5000
   apikey: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  #dry_run: True
+  #dry_run: true
   #mappings:
   #  /GDRIVE: /mnt/gds2/GDRIVE
   #headers:
@@ -28,24 +28,30 @@ plex:
   token: xxxxxxxxxxxxxxxxxxxx
   application: /usr/lib/plexmediaserver
   support: /var/lib/plexmediaserver/Library/Application Support/Plex Media Server
-  machine_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  machine_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 메타데이터 링크에 사용
   #link: http://plex.oracle:32400/web/index.html#!/server/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/details?key=%2Flibrary%2Fmetadata%2F
-  #check_count: 120
-  #check_interval: 10
-  #force_rematch: false
-  #score_min: 70
+  #check_count: 120 # 플렉스 업데이트 완료 확인 최대 횟수
+  #check_interval: 10 # 업데이트 완료 확인 간격 (초), 최대 대기 시간 = check_count * check_interval
+  #force_rematch: false # true | false (true일 경우 guid가 동일해도 강제로 일치항목 수정 실행)
+  #score_min: 70 # 검색 결과물의 일치 점수가 score_min 보다 낮으면 업데이트 건너 뛰기 (주의: 일치 점수를 제공하지 않는 agent의 일치 점수는 일괄 -1)
+
+  # extra_agents 에 적용되는 최소 일치 점수
+  #   - score_min=90, score_min_extra=-1 : 첫번째 검색 일치 점수가 90보다 낮으면 두번째 검색을 무조건 채택
+  #   - score_min=90, score_min_extra=80 : 첫번째 검색 일치 점수가 90보다 낮으면 두번째 검색 일치 점수가 80 이상인 결과를 채택 그외 건너 뛰기
+  #   - score_min=-1, score_min_extra=-1 : 첫번째 검색 중에서만 채택
+  #   - score_min=999, score_min_extra=80 : 첫번째 검색을 무조건 건너뛰고 두번째 검색을 수행
   #score_min_extra: -1
-  #title_match_ratio: 0.7
-  #margin_of_year: 5000
-  #extra_agents:
+  #title_match_ratio: 0.7 # 검색 결과물의 제목과 원본 제목의 최소 일치율 (0.0 ~ 1.0)
+  #margin_of_year: 5000 # 검색 결과물의 연도가 일치한다고 판단하는 허용 범위. (원본의 연도가 2000년, margin_of_year=3 이면 검색 결과물의 연도는 1997~2003 까지 허용)
+  #extra_agents: # 라이브러리의 기본 agent로 검색한 결과가 없거나 일치 조건에 맞지 않으면 추가로 EXTRA_AGENTS에 저장한 agent로 한번 더 검색
   #  1: com.plexapp.agents.themoviedb
   #  2: com.plexapp.agents.thetvdb
   #  8: com.plexapp.agents.lastfm
   #  9: com.plexapp.agents.lastfm
-  #db: /plex/Library/Application Support/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db
-  #metadata: /plex/Library/Application Support/Plex Media Server/Metadata
-  #media: /plex/Library/Application Support/Plex Media Server/Media
-  #sqlite: /usr/lib/plexmediaserver/Plex SQLite
+  #db: /plex/Library/Application Support/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db # 경로를 직접 지정할 경우
+  #metadata: /plex/Library/Application Support/Plex Media Server/Metadata # 경로를 직접 지정할 경우
+  #media: /plex/Library/Application Support/Plex Media Server/Media # 경로를 직접 지정할 경우
+  #sqlite: /usr/lib/plexmediaserver/Plex SQLite # 경로를 직접 지정할 경우
   #metadata_url_columns: ['user_thumb_url', 'user_art_url', 'user_banner_url', 'user_music_url', 'user_clear_logo_url']
   #media_types:
   #  1: movie
