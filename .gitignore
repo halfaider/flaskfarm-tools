@@ -1,0 +1,12 @@
+*
+!__init__.py
+!.gitignore
+!app.sample.py
+!config.py
+!config.sample.yaml
+!helpers.py
+!kavita.py
+!plex_rematch.py
+!plex_update_metamedia.py
+!plex.py
+!requirements.txt

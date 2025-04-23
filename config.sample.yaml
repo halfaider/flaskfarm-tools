@@ -1,0 +1,90 @@
+default:
+  # default 설정은 각 앱의 기본 값으로 사용되고 앱 설정 값이 있을 경우 앱 설정 값을 사용합니다.
+  dry_run: False
+  #mappings:
+  #  /GDRIVE: /mnt/gds2/GDRIVE
+  #headers:
+  #  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36
+  #workers: 2
+  #batch_size: 100
+  #retry: 10
+  #countdown: 5
+
+kavita:
+  url: http://kavita:5000
+  apikey: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  #dry_run: True
+  #mappings:
+  #  /GDRIVE: /mnt/gds2/GDRIVE
+  #headers:
+  #  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36
+  #workers: 2
+  #batch_size: 100
+  #retry: 10
+  #countdown: 5
+
+plex:
+  url: http://plex.oracle:32400
+  token: xxxxxxxxxxxxxxxxxxxx
+  application: /usr/lib/plexmediaserver
+  support: /var/lib/plexmediaserver/Library/Application Support/Plex Media Server
+  machine_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  #link: http://plex.oracle:32400/web/index.html#!/server/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/details?key=%2Flibrary%2Fmetadata%2F
+  #check_count: 120
+  #check_interval: 10
+  #force_rematch: false
+  #score_min: 70
+  #score_min_extra: -1
+  #title_match_ratio: 0.7
+  #margin_of_year: 5000
+  #extra_agents:
+  #  1: com.plexapp.agents.themoviedb
+  #  2: com.plexapp.agents.thetvdb
+  #  8: com.plexapp.agents.lastfm
+  #  9: com.plexapp.agents.lastfm
+  #db: /plex/Library/Application Support/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db
+  #metadata: /plex/Library/Application Support/Plex Media Server/Metadata
+  #media: /plex/Library/Application Support/Plex Media Server/Media
+  #sqlite: /usr/lib/plexmediaserver/Plex SQLite
+  #metadata_url_columns: ['user_thumb_url', 'user_art_url', 'user_banner_url', 'user_music_url', 'user_clear_logo_url']
+  #media_types:
+  #  1: movie
+  #  2: show
+  #  3: season
+  #  4: episode
+  #  5: trailer
+  #  6: comic
+  #  7: person
+  #  8: artist
+  #  9: album
+  #  10: track
+  #  11: picture
+  #  12: clip
+  #  13: photo
+  #  14: photoalbum
+  #  15: playlist
+  #  16: playlistFolder
+  #  18: collection
+  #  42: optimizedVersion
+  #dry_run: True
+  #mappings:
+  #  /GDRIVE: /mnt/gds2/GDRIVE
+  #headers:
+  #  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36
+  #workers: 2
+  #batch_size: 100
+  #retry: 10
+  #countdown: 5
+
+logging:
+  level: debug
+  #format: '%(asctime)s|%(levelname)8s| %(message)s <%(filename)s:%(lineno)d#%(funcName)s>'
+  format: '%(asctime)s|%(levelname)8s| %(message)s'
+  date_format: '%Y-%m-%d %H:%M:%S'
+  redacted_patterns:
+    - "apikey=(.{10,36})"
+    - "['\"]apikey['\"]: ['\"](.{10,36})['\"]"
+    - "['\"]X-Plex-Token['\"]: ['\"](.{20})['\"]"
+    - "['\"]X-Plex-Token=(.{20})['\"]"
+    - "webhooks/(.+)/(.+):\\s{"
+  redacted_substitute: "<REDACTED>"
