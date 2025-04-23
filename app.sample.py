@@ -9,24 +9,22 @@ import time
 import logging
 import sqlite3
 import asyncio
+from typing import Any
 
 import plex
 import plex_update_metamedia
 import plex_rematch
 import config
-from helpers import mem_usage, set_logger
+from helpers import mem_usage
 
 logger = logging.getLogger(__name__)
 
-if __name__ == "__main__":
-    start_mem = mem_usage()
-    start_time = time.time()
-
+async def main(*args: Any, **kwds: Any) -> None:
     """
     포스터 파일이 삭제되어 포스터 표시가 안 되는 메타데이터 중 포스터 url 정보가 있으면 url로 대체
     URL이 없을 경우 영화와 쇼는 새로고침, 에피소드는 분석
     모든 섹션을 지정하려면 -1 입력"""
-    #plex_update_metamedia.main(9)
+    #await plex_update_metamedia.update_metamedia(-1)
 
     """
     - "title" column 값이 정확히 "인터스텔라"인 데이터:
@@ -56,7 +54,7 @@ if __name__ == "__main__":
     파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
     마운트 오류로 삭제되는 걸 방지하기 위해 두번째 인자의 경로가 존재할 때만 삭제처리
     모든 섹션을 지정하려면 -1 입력"""
-    #asyncio.run(plex.delete_not_exists(12, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중'))
+    #await plex.delete_not_exists(12, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중')
 
     """
     라이브러리 색인 목록의 음절을 자음으로 수정
@@ -106,7 +104,12 @@ if __name__ == "__main__":
     #        logger.debug(row)
     #        result = await plex.refresh(row['id'])
     #        await plex.check_update(row['id'], result, start)
-    #asyncio.run(refresh_season())
+    #await refresh_season()
 
+
+if __name__ == "__main__":
+    start_mem = mem_usage()
+    start_time = time.time()
+    asyncio.run(main())
     logger.debug(f"메모리 변동: {mem_usage() - start_mem:.3f}MB")
     logger.debug(f"걸린 시간: {time.time() - start_time:.3f}s")

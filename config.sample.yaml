@@ -13,6 +13,7 @@ default:
 kavita:
   url: http://kavita:5000
   apikey: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  #db: /kavita/config/kavita.db
   #dry_run: true
   #mappings:
   #  /GDRIVE: /mnt/gds2/GDRIVE

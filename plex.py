@@ -6,16 +6,16 @@ import asyncio
 import pathlib
 import logging
 import traceback
-import functools
 import unicodedata
 import urllib.parse
 from typing import Generator, Sequence, Any, Callable
 
 from config import plex as config
-from helpers import run, http_api
+from helpers import run, http_api, retrieve_db
 
 logger = logging.getLogger(__name__)
 http_api = http_api(config.headers)
+retrieve_db = retrieve_db(config.db)
 
 
 def _execute(query: str,
@@ -61,20 +61,6 @@ def execute_json(query: str) -> Generator[dict, None, None]:
             pass
         except:
             logger.error(traceback.format_exc())
-
-
-def dict_factory(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
-    fields: Generator = (column[0] for column in cursor.description)
-    return {key: value for key, value in zip(fields, row)}
-
-
-def retrieve_db(func: Callable) -> Callable:
-    @functools.wraps(func)
-    def wrap(*args: Any, db: str = config.db, **kwds: Any) -> Any:
-        with sqlite3.connect(db) as con:
-            con.row_factory = dict_factory
-            return func(*args, con=con, **kwds)
-    return wrap
 
 
 @retrieve_db

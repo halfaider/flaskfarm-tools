@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import urllib.parse
-from typing import Any
+import sqlite3
+from typing import Any, Generator
 
 from config import kavita as config
-from helpers import http_api
+from helpers import http_api, retrieve_db
 
 logger = logging.getLogger(__name__)
 http_api = http_api(config.headers)
+retrieve_db = retrieve_db(config.db)
 
 
 @http_api
@@ -26,6 +28,18 @@ def scan_folder(folder: str, url: str = config.url, apikey: str = config.apikey)
         'json': {'folderPath': folder, 'apiKey': apikey},
         'method': 'POST',
     }
+
+
+@retrieve_db
+def fetch_one(query: str, con: sqlite3.Connection) -> dict:
+    return con.execute(query).fetchone()
+
+
+@retrieve_db
+def fetch_all(query: str, con: sqlite3.Connection) -> Generator[dict, None, None]:
+    for row in con.execute(query):
+        yield row
+
 
 async def main(*args: Any, **kwds: Any) -> None:
     result = await plugin_authenticate()

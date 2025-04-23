@@ -119,6 +119,7 @@ class PlexConfig(_BaseConfig, _PlexConfig):
 class _KavitaConfig:
     url: str
     apikey: str
+    db: str
 
 
 @dataclasses.dataclass

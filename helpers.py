@@ -4,6 +4,7 @@ import subprocess
 import logging
 import functools
 import re
+import sqlite3
 from typing import Any, Generator, Sequence, Iterable, Coroutine, Callable
 
 import psutil
@@ -49,9 +50,20 @@ def run(cmd: Sequence[str], timeout: int = 300, **kwds: Any) -> Generator[str, N
         return False
 
 
-def dict_factory(cursor, row):
+def dict_factory(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
     fields: Generator = (column[0] for column in cursor.description)
     return {key: value for key, value in zip(fields, row)}
+
+
+def retrieve_db(database: str) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrap(*args: Any, **kwds: Any) -> Any:
+            with sqlite3.connect(database) as con:
+                con.row_factory = dict_factory
+                return func(*args, con=con, **kwds)
+        return wrap
+    return decorator
 
 
 async def check_tasks(tasks: list[asyncio.Task], interval: int = 60) -> None:
@@ -188,7 +200,7 @@ def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
                         if response.content and response.content_type == 'application/json':
                             result['json'] = await response.json()
                 except Exception as e:
-                    logger.error(e)
+                    logger.warning(repr(e))
                     result['exception'] = str(e)
             return result
         return wrapper
