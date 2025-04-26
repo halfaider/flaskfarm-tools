@@ -230,16 +230,23 @@ def get_extra_data_url(extra_data: dict) -> str:
 
 
 @retrieve_db
-async def delete_not_exists(section_id: int | str, mount_anchor: str, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
+async def delete_not_exists(section_id: int, mount_anchor: str, /, con: sqlite3.Connection, dry_run: bool = config.dry_run, print_exists: bool = False) -> None:
     """파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
     Args:
-        section_id (int | str): 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
-        mount_anchor (str): 폴더 안에 있는 파일을 삭제할 경로.  마운트 오류로 삭제되는 걸 방지하기 위해 mount_anchor로 지정한 경로가 존재할 때만 삭제
-        con (sqlite3.Connection): sqlite3 커넥션. 데코레이터에 의해 자동 입력
-        dry_run (bool, optional): 실제 실행 여부
+        section_id: 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
+        mount_anchor: 폴더 안에 있는 파일을 삭제할 경로. 마운트 오류로 삭제되는 걸 방지하기 위해 mount_anchor로 지정한 경로가 존재할 때만 삭제
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+        dry_run: 실제 실행 여부. 기본값: ``config.yaml``에 정의된 dry_run
+        print_exists: 존재하는 파일을 디버그 로그에 출력할 지 여부. 기본값: False
 
     Returns:
-        None
+        None:
+
+    Examples:
+        전체 섹션 탐색
+
+        >>> delete_not_exists(-1, '/mnt/gds/GDRIVE/VIDEO/방송중', dry_run=True, print_exists=True)
+
     """
     query = """SELECT media_parts.id AS part_id, media_items.id AS media_id, metadata_items.id AS meta_id, media_parts.file
     FROM media_parts, media_items, metadata_items
@@ -257,7 +264,8 @@ async def delete_not_exists(section_id: int | str, mount_anchor: str, con: sqlit
             continue
         path = pathlib.Path(file)
         if path.exists():
-            logger.debug(f"{idx}. {row['meta_id']}: {str(path)}")
+            if print_exists:
+                logger.debug(f"{idx}. {row['meta_id']}: {str(path)}")
             continue
         logger.info(f"{row['meta_id']}: NOT EXISTS: {str(path)}")
         if not anchor.exists():
@@ -271,15 +279,18 @@ async def delete_not_exists(section_id: int | str, mount_anchor: str, con: sqlit
 
 
 @retrieve_db
-def update_title_sort(section_id: int | str, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
+def update_title_sort(section_id: int, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
     """라이브러리 색인 목록의 음절을 자음으로 수정
     Args:
-        section_id (int | str): 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
-        con (sqlite3.Connection): sqlite3 커넥션. 데코레이터에 의해 자동 입력
-        dry_run (bool, optional): 실제 실행 여부
+        section_id: 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+        dry_run: 실제 실행 여부
 
     Returns:
-        None
+        None:
+    Examples:
+        전체 섹션 탐색
+        >>> update_title_sort(-1, dry_run=True)
     """
     query = "SELECT id, title, title_sort, metadata_type FROM metadata_items"
     if int(section_id) > 0:
@@ -312,11 +323,13 @@ def update_title_sort(section_id: int | str, con: sqlite3.Connection, dry_run: b
 def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
     """메타데이터와 연결된 리뷰의 source 데이터를 수정
     Args:
-        con (sqlite3.Connection): sqlite3 커넥션. 데코레이터에 의해 자동 입력
-        dry_run (bool, optional): 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+        dry_run: 실제 실행 여부
 
     Returns:
-        None
+        None:
+    Examples:
+        >>> update_review_source(dry_run=True)
     """
     query = f"SELECT taggings.id, taggings.extra_data FROM taggings, tags WHERE tags.tag_type = 10 AND taggings.tag_id = tags.id AND taggings.extra_data LIKE ?;"
     cursor: sqlite3.Cursor = con.execute(query, ('%"at:source":""%',))
@@ -343,13 +356,15 @@ def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run
 def update_clip_key(search: str, replace: str, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
     """부가 영상의 url을 수정
     Args:
-        search (str): 찾을 내용
-        replace (str): 바꿀 내용
-        con (sqlite3.Connection): sqlite3 커넥션. 데코레이터에 의해 자동 입력
-        dry_run (bool, optional): 실제 실행 여부
+        search: 찾을 내용
+        replace: 바꿀 내용
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+        dry_run: 실제 실행 여부
 
     Returns:
-        None
+        None:
+    Examples:
+        >>> update_clip_key('http://localhost:9999', 'https://my.ff.dns.org', dry_run=True)
     """
     query = f"SELECT id, media_parts.extra_data FROM media_parts WHERE media_parts.extra_data LIKE ?"
     cursor: sqlite3.Cursor = con.execute(query, (f"%{search}%",))
