@@ -1,7 +1,7 @@
 import asyncio
 import logging
-import urllib.parse
 import sqlite3
+import urllib.parse
 from typing import Any, Generator, Sequence
 
 from config import kavita as config

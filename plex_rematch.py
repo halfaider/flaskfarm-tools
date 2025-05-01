@@ -1,16 +1,18 @@
+import sys
 import asyncio
 import pathlib
-import traceback
 import logging
-import sys
+import traceback
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
-from guessit import guessit
-
 import plex
-from helpers import queue_task
+from helpers import queue_task, check_packages
 from config import plex as config
+
+check_packages((('guessit', 'guessit'),))
+
+from guessit import guessit
 
 logger = logging.getLogger(__name__)
 

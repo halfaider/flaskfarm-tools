@@ -1,11 +1,23 @@
+import re
+import sys
 import time
 import asyncio
-import subprocess
 import logging
-import functools
-import re
 import sqlite3
+import functools
+import subprocess
 from typing import Any, Generator, Sequence, Iterable, Coroutine, Callable
+
+
+def check_packages(packages: Iterable[Sequence[str]]) -> None:
+    for pkg, pi in packages:
+        try:
+            __import__(pkg)
+        except:
+            subprocess.check_call((sys.executable, '-m', 'pip', 'install', '-U', pi))
+
+
+check_packages((('psutil', 'psutil'), ('aiohttp', 'aiohttp')))
 
 import psutil
 import aiohttp

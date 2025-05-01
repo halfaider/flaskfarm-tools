@@ -1,10 +1,10 @@
+import sys
+import time
 import sqlite3
 import pathlib
-import traceback
 import asyncio
-import time
 import logging
-import sys
+import traceback
 import xml.etree.ElementTree as ET
 from typing import Any, Iterable
 
@@ -15,9 +15,9 @@ from config import plex as config
 logger = logging.getLogger(__name__)
 
 
-async def phase_1(con: sqlite3.Connection, 
-                  query: str, 
-                  dry_run: bool = config.dry_run, 
+async def phase_1(con: sqlite3.Connection,
+                  query: str,
+                  dry_run: bool = config.dry_run,
                   start_count: int = config.countdown,
                   columns: Iterable[str] = config.metadata_url_columns) -> None:
     # 1차 시도: 새로운 Plex 기본 에이전트는 Info.xml을 사용하지 않고 DB에 포스터 url을 저장함
@@ -159,9 +159,9 @@ async def phase_2(con: sqlite3.Connection, query: str, dry_run: bool = config.dr
         plex.execute_batch(batch_queries)
 
 
-async def phase_3(con: sqlite3.Connection, 
-                  query: str, 
-                  dry_run: bool = config.dry_run, 
+async def phase_3(con: sqlite3.Connection,
+                  query: str,
+                  dry_run: bool = config.dry_run,
                   start_count: int = config.countdown,
                   media_path: str = config.media,
                   plex_link: str = config.link,

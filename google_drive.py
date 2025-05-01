@@ -5,15 +5,17 @@ import logging
 import traceback
 from typing import Any
 
+from helpers import apply_cache, get_ttl_hash, check_packages
+from config import google as config
+
+check_packages((('httplib2', 'httplib2'), ('google_auth_httplib2', 'google-auth-httplib2'), ('google-api-python-client', 'google-api-python-client')))
+
 from httplib2 import Http
 from google_auth_httplib2 import AuthorizedHttp
 from google.oauth2 import credentials
 from googleapiclient.discovery import build, Resource
 from googleapiclient.http import HttpRequest
 from googleapiclient import errors
-
-from helpers import apply_cache, get_ttl_hash
-from config import google as config
 
 logger = logging.getLogger(__name__)
 

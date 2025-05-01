@@ -8,7 +8,7 @@ import logging
 import traceback
 import unicodedata
 import urllib.parse
-from typing import Generator, Sequence, Any, Callable
+from typing import Generator, Sequence
 
 from config import plex as config
 from helpers import run, http_api, retrieve_db

@@ -7,9 +7,12 @@ import logging
 import dataclasses
 from typing import Mapping, Sequence
 
-import yaml
-
+from helpers import check_packages
 from helpers import set_logger
+
+check_packages((('yaml', 'pyyaml'),))
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -156,12 +159,12 @@ class GoogleConfig(_BaseConfig, _GoogleConfig):
 
 
 yaml_config = None
-for yaml_file in (pathlib.Path(os.getcwd(), 'config.yaml'),
-                  pathlib.Path(__file__).with_name('config.yaml')):
+for yaml_file in (pathlib.Path(__file__).with_name('config.yaml'),
+                  pathlib.Path(os.getcwd(), 'config.yaml')):
     try:
         with open(yaml_file, 'r') as file_stream:
             yaml_config = yaml.safe_load(file_stream)
-            logger.info(f'{yaml_file.resolve()} 파일을 불러왔습니다.')
+            print(f'{yaml_file.resolve()} 파일을 불러왔습니다.')
             break
     except:
         pass
