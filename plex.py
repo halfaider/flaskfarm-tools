@@ -350,8 +350,8 @@ def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run
         logger.debug(f"└metadata_id={row['metadata_item_id']}  after={extra_data}")
         if row['extra_data'] != (extra_data_json := json.dumps(extra_data)):
             execute_queries.append("UPDATE taggings SET extra_data = '" + extra_data_json.replace("'", "''") + f"' WHERE id={row.get('id')}")
-        if not dry_run and execute_queries:
-            execute_batch(execute_queries)
+    if not dry_run and execute_queries:
+        execute_batch(execute_queries)
 
 
 @retrieve_db
