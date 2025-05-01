@@ -320,16 +320,18 @@ def update_title_sort(section_id: int, con: sqlite3.Connection, dry_run: bool = 
 
 
 @retrieve_db
-def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
+def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run, new_text: str = 'Unknown') -> None:
     """메타데이터와 연결된 리뷰의 source 데이터를 수정
     Args:
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
         dry_run: 실제 실행 여부
+        new_text: 대체할 문자
 
     Returns:
         None:
     Examples:
         >>> update_review_source(dry_run=True)
+        >>> update_review_source(dry_run=False, new_text='blank')
     """
     query = f"SELECT taggings.id, taggings.extra_data, taggings.metadata_item_id FROM taggings, tags WHERE tags.tag_type = 10 AND taggings.tag_id = tags.id AND taggings.extra_data LIKE ?;"
     cursor: sqlite3.Cursor = con.execute(query, ('%"at:source":""%',))
@@ -343,7 +345,7 @@ def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run
         if not extra_data.get('at:source') == '':
             continue
         logger.debug(f"┌metadata_id={row['metadata_item_id']} before={extra_data.copy()}")
-        extra_data['at:source'] = "unknown"
+        extra_data['at:source'] = new_text
         extra_data['url'] = get_extra_data_url(extra_data)
         logger.debug(f"└metadata_id={row['metadata_item_id']}  after={extra_data}")
         if row['extra_data'] != (extra_data_json := json.dumps(extra_data)):
