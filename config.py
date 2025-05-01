@@ -189,11 +189,15 @@ set_logger(
 this = sys.modules[__name__]
 default_config = yaml_config.pop('default', {}) or {}
 for key in yaml_config:
-    base = copy.deepcopy(default_config)
-    base.update(yaml_config[key] or {})
-    class_name = key.capitalize() + 'Config'
-    class_ = getattr(this, class_name)
-    setattr(this, key, class_(**base))
+    try:
+        base = copy.deepcopy(default_config)
+        base.update(yaml_config.get(key) or {})
+        class_name = key.capitalize() + 'Config'
+        class_ = getattr(this, class_name)
+        setattr(this, key, class_(**base))
+    except Exception as e:
+        logger.exception('설정을 불러 올 수 없습니다.')
+        logger.error(f'{key=} type={type(yaml_config.get(key))}')
 
 if __name__ == '__main__':
     #logger.debug(getattr(this, 'plex'))
