@@ -331,7 +331,7 @@ def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run
     Examples:
         >>> update_review_source(dry_run=True)
     """
-    query = f"SELECT taggings.id, taggings.extra_data FROM taggings, tags WHERE tags.tag_type = 10 AND taggings.tag_id = tags.id AND taggings.extra_data LIKE ?;"
+    query = f"SELECT taggings.id, taggings.extra_data taggings.metadata_item_id FROM taggings, tags WHERE tags.tag_type = 10 AND taggings.tag_id = tags.id AND taggings.extra_data LIKE ?;"
     cursor: sqlite3.Cursor = con.execute(query, ('%"at:source":""%',))
     execute_queries = []
     for row in cursor:
