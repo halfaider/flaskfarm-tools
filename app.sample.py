@@ -48,7 +48,7 @@ async def main(*args: Any, **kwds: Any) -> None:
     쿼리문을 대상으로 일치항목 변경을 시도
     """
     #query = f"SELECT * FROM metadata_items WHERE guid LIKE '%sjva_agent://%' AND metadata_type = 1 LIMIT 10;"
-    #plex_rematch.main(query)
+    #await plex_rematch.main_(query)
 
     """
     파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
