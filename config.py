@@ -195,9 +195,9 @@ for key in yaml_config:
         class_name = key.capitalize() + 'Config'
         class_ = getattr(this, class_name)
         setattr(this, key, class_(**base))
-    except Exception as e:
-        logger.exception('설정을 불러 올 수 없습니다.')
-        logger.error(f'{key=} type={type(yaml_config.get(key))}')
+    except:
+        logger.exception(f'{key=} type={type(yaml_config.get(key))}')
+        logger.error(yaml_file)
 
 if __name__ == '__main__':
     #logger.debug(getattr(this, 'plex'))
