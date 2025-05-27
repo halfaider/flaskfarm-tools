@@ -214,6 +214,48 @@ async def worker(queue: asyncio.Queue,
             logger.debug(f'작업 종료({name}): {info}')
 
 
+async def force_match_with_agent(metadata_ids: Iterable, agent: str) -> None:
+    """기본 에이전트로 설정된 라이브러리에서 타 에이전트로 강제 매칭을 시도. 매칭 후 메타데이터 새로고침을 하면 원래 에이전트의 데이터로 복구 됨.
+    Args:
+        metadata_ids: 매칭할 메타데이터 id 목록. 모두 동일한 section의 메타데이터여야 함
+        agent: 강제로 매칭할 에이전트
+
+    Returns:
+        None:
+
+    Examples:
+        >>> await force_match_with_agent([104435, 120317], 'com.plexapp.agents.sjva_agent_movie')
+    """
+    # metadata_ids 는 모두 동일한 section으로 간주
+    for metadata_id in metadata_ids:
+        metadata = plex.get_metadata_by_id(metadata_id)
+        section = plex.get_section_by_id(metadata.get('library_section_id'))
+        if section:
+            break
+        else:
+            continue
+    else:
+        logger.error(f'section 을 찾을 수 없습니다: {metadata_ids}')
+    try:
+        # 임시로 라이브러리 에이전트를 변경
+        queries = [f"UPDATE library_sections SET agent = '{agent}' WHERE id = {section['id']}"]
+        plex.execute_batch(queries)
+        changed_agent = plex.fetch_one(f"SELECT agent FROM library_sections WHERE id = {section['id']}")
+        logger.debug(f'에이전트 변경: {changed_agent}')
+
+        # rematch
+        to_be_matched = ",".join(map(str, metadata_ids))
+        await main_(f'SELECT * FROM metadata_items WHERE id IN ({to_be_matched})')
+    except Exception as e:
+        logger.exception(repr(e))
+    finally:
+        # 원래 에이전트로 복구
+        queries = [f"UPDATE library_sections SET agent = '{section['agent']}' WHERE id = {section['id']}"]
+        plex.execute_batch(queries)
+        final_agent = plex.fetch_one(f"SELECT agent FROM library_sections WHERE id = {section['id']}")
+        logger.debug(f'에이전트 복구: {final_agent}')
+
+
 async def main_(query: str, dry_run: bool = config.dry_run, worker_size: int = config.workers, plex_link: str = config.link) -> None:
     if not dry_run:
         await queue_task(worker, asyncio.Queue(), plex.fetch_all(query), task_size=worker_size, prefix='rematch')

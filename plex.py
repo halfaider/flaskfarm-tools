@@ -109,12 +109,12 @@ def empty_trash(section_id: int = -1, url: str = config.url) -> tuple[bool, str]
 
 @http_api
 def matches(metadata_id: int,
-                title: str,
-                year: int = None,
-                agent: str = None,
-                manual: bool = True,
-                language: str = 'ko',
-                url: str = config.url) -> dict:
+            title: str,
+            year: int = None,
+            agent: str = None,
+            manual: bool = True,
+            language: str = 'ko',
+            url: str = config.url) -> dict:
     params = {
         'title': title,
     }
@@ -191,6 +191,11 @@ async def is_updated(metadata_id: int, start: float) -> bool:
             logger.info(f"업데이트 완료: {msg}")
             return True
         else:
+            # 업데이트할 필요가 없어서 timestamp가 변경되지 않을 경우 계속 대기해야 함
+            for act in fetch_all(f'SELECT * FROM activities WHERE finished_at > {int(start)}'):
+                if row['title'] in act['subtitle']:
+                    logger.info(f"활동이 완료됨: {act}")
+                    return True
             logger.info(f"업데이트 중: {msg}")
             return False
 
