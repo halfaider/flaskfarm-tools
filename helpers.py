@@ -4,6 +4,7 @@ import time
 import asyncio
 import logging
 import sqlite3
+import datetime
 import functools
 import subprocess
 from typing import Any, Generator, Sequence, Iterable, Coroutine, Callable
@@ -178,6 +179,14 @@ class RedactedFormatter(logging.Formatter):
                 for found in groups:
                     msg = self.redact(re.compile(found, re.I), msg)
         return msg
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str = None):
+        dt = datetime.datetime.fromtimestamp(record.created)
+        if datefmt:
+            s = dt.strftime(datefmt)
+            return s[:-3]
+        else:
+            return super().formatTime(record, datefmt)
 
     def redact(self, pattern: re.Pattern, text: str) -> str:
         return pattern.sub(self.substitute, text)
