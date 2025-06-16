@@ -51,7 +51,7 @@ async def phase_2(con: sqlite3.Connection, query: str, dry_run: bool = config.dr
 
         logger.debug(f'{idx}. 2차 분석중: id={row["id"]} title="{row["title"]}"')
 
-        hash, parent_row, grand_parent_row = get_ancestors(row, con)
+        hash, parent_row, grand_parent_row = plex.get_ancestors(row, con)
         if row['metadata_type'] == 3 and not parent_row:
             logger.warning(f'시즌의 부모가 없음: {row}')
             continue
@@ -59,7 +59,7 @@ async def phase_2(con: sqlite3.Connection, query: str, dry_run: bool = config.dr
             logger.warning(f'에피소드의 조부모가 없음: {row}')
             continue
 
-        path_contents = get_contents_path(hash, row['metadata_type'])
+        path_contents = plex.get_bundle_path(hash, row['metadata_type']) + '/Contents'
         path_info = path_contents / '_combined' / 'Info.xml'
 
         if not path_info.exists():
@@ -188,7 +188,7 @@ async def phase_3(con: sqlite3.Connection,
         media://c/a7b0b87bec1b4257f8deffefa012739b462e735.bundle/Contents/Thumbnails/thumb1.jpg
         https://metadata-static.plex.tv/extras/iva/895274/40486edd920333c90d9e685649ff0e8c.jpg
         '''
-        hash, parent_row, grand_parent_row = get_ancestors(row, con)
+        hash, parent_row, grand_parent_row = plex.get_ancestors(row, con)
         if row['metadata_type'] == 3 and not parent_row:
             logger.warning(f'시즌의 부모가 없음: {row}')
             continue
@@ -196,7 +196,7 @@ async def phase_3(con: sqlite3.Connection,
             logger.warning(f'에피소드의 조부모가 없음: {row}')
             continue
 
-        path_contents = get_contents_path(hash, row['metadata_type'])
+        path_contents = plex.get_bundle_path(hash, row['metadata_type']) + '/Contents'
 
         #for column in config.metadata_url_columns:
         for column in ('user_thumb_url',):
@@ -257,42 +257,19 @@ async def phase_3(con: sqlite3.Connection,
 
 
 @plex.retrieve_db
-async def update_metamedia(section_id: int | str, con: sqlite3.Connection) -> None:
-    query = f"SELECT * FROM metadata_items WHERE metadata_type IN (1, 2, 3, 4)"
-    if int(section_id) > 0:
-        query += f" AND library_section_id = {section_id}"
-    await phase_1(con, query)
-    await phase_2(con, query)
-    await phase_3(con, query)
-
-
-def get_contents_path(hash: str, metadata_type: str, metadata_path: str = config.metadata) -> pathlib.Path:
-    if metadata_type == 1:
-        content_type = 'Movies'
-    elif metadata_type in (2, 3, 4):
-        content_type = 'TV Shows'
+async def update_metamedia(metadata_id: int | str = None, section_id: int | str = None, query: str = None, con: sqlite3.Connection = None) -> None:
+    select_query = f"SELECT * FROM metadata_items WHERE metadata_type IN (1, 2, 3, 4)"
+    if metadata_id and int(metadata_id) > 0:
+        select_query += f" AND id = {metadata_id}"
+    elif section_id and int(section_id) > 0:
+        select_query += f" AND library_section_id = {section_id}"
+    elif query:
+        select_query = query
     else:
-        return None
-    return pathlib.Path(metadata_path) / content_type / hash[0] / f"{hash[1:]}.bundle" / 'Contents'
-
-
-def get_ancestors(row: dict, con: sqlite3.Connection) -> pathlib.Path:
-    parent_row = None
-    grand_parent_row = None
-    if row['metadata_type'] in (3, 4):
-        parent_row = con.execute(
-            f"SELECT * FROM metadata_items WHERE id = ?",
-            (row['parent_id'],)
-        ).fetchone()
-        if row['metadata_type'] == 4:
-            grand_parent_row = con.execute(
-                f"SELECT * FROM metadata_items WHERE id = ?",
-                (parent_row['parent_id'],)
-            ).fetchone()
-        hash = grand_parent_row['hash'] if row['metadata_type'] == 4 else parent_row['hash']
-    else:
-        hash = row['hash']
-    return hash, parent_row, grand_parent_row
+        raise ValueError('metadata_id, section_id, query 중 하나를 지정해야 함')
+    await phase_1(con, select_query)
+    await phase_2(con, select_query)
+    await phase_3(con, select_query)
 
 
 async def worker(queue: asyncio.Queue, name: str, job: str, plex_link: str = config.link) -> None:

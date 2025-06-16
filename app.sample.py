@@ -76,6 +76,12 @@ async def main(*args: Any, **kwds: Any) -> None:
     #plex.update_review_source()
 
     """
+    번들 폴더를 삭제 후 메타데이터 새로고침
+    누적된 포스터 목록을 초기화 하는 등의 용도로 사용
+    메타데이터 ID를 입력"""
+    #await plex.clean_bundle(123456)
+
+    """
     Plex DB 쿼리 실행
     조회는 fectch_all() 혹은 fetch_one() 사용
     DB 수정은 execte(), execute_batch(), execute_gen() 사용

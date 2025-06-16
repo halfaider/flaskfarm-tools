@@ -1,6 +1,7 @@
 import re
 import json
 import time
+import shutil
 import sqlite3
 import asyncio
 import pathlib
@@ -64,29 +65,29 @@ def execute_json(query: str) -> Generator[dict, None, None]:
 
 
 @retrieve_db
-def fetch_one(query: str, con: sqlite3.Connection) -> dict:
+def fetch_one(query: str, con: sqlite3.Connection = None) -> dict:
     return con.execute(query).fetchone()
 
 
 @retrieve_db
-def fetch_all(query: str, con: sqlite3.Connection) -> Generator[dict, None, None]:
+def fetch_all(query: str, con: sqlite3.Connection = None) -> Generator[dict, None, None]:
     for row in con.execute(query):
         yield row
 
 
 @retrieve_db
-def get_metadata_by_id(metadata_id: int, con: sqlite3.Connection) -> dict:
+def get_metadata_by_id(metadata_id: int, con: sqlite3.Connection = None) -> dict:
     query = f"SELECT * FROM metadata_items WHERE id = ?"
     return con.execute(query, (metadata_id,)).fetchone()
 
 @retrieve_db
-def get_section_by_id(section_id: int, con: sqlite3.Connection) -> dict:
+def get_section_by_id(section_id: int, con: sqlite3.Connection = None) -> dict:
     query = f"SELECT * FROM library_sections WHERE id = ?"
     return con.execute(query, (section_id,)).fetchone()
 
 
 @retrieve_db
-def get_media_parts_by_metadata_id(metadata_id: int, con: sqlite3.Connection) -> list:
+def get_media_parts_by_metadata_id(metadata_id: int, con: sqlite3.Connection = None) -> list:
     query = f"SELECT media_parts.id, media_parts.file FROM media_parts, media_items WHERE media_parts.media_item_id = media_items.id AND media_items.metadata_item_id = ?"
     return con.execute(query, (metadata_id,)).fetchall()
 
@@ -235,14 +236,14 @@ def get_extra_data_url(extra_data: dict) -> str:
 
 
 @retrieve_db
-async def delete_not_exists(section_id: int, mount_anchor: str, /, con: sqlite3.Connection, dry_run: bool = config.dry_run, print_exists: bool = False) -> None:
+async def delete_not_exists(section_id: int, mount_anchor: str, /, dry_run: bool = config.dry_run, print_exists: bool = False, con: sqlite3.Connection = None) -> None:
     """파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
     Args:
         section_id: 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
         mount_anchor: 폴더 안에 있는 파일을 삭제할 경로. 마운트 오류로 삭제되는 걸 방지하기 위해 mount_anchor로 지정한 경로가 존재할 때만 삭제
-        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
         dry_run: 실제 실행 여부. 기본값: ``config.yaml``에 정의된 dry_run
         print_exists: 존재하는 파일을 디버그 로그에 출력할 지 여부. 기본값: False
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
@@ -284,12 +285,12 @@ async def delete_not_exists(section_id: int, mount_anchor: str, /, con: sqlite3.
 
 
 @retrieve_db
-def update_title_sort(section_id: int, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
+def update_title_sort(section_id: int, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """라이브러리 색인 목록의 음절을 자음으로 수정
     Args:
         section_id: 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
-        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
         dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
@@ -325,12 +326,12 @@ def update_title_sort(section_id: int, con: sqlite3.Connection, dry_run: bool = 
 
 
 @retrieve_db
-def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run, new_text: str = 'Unknown') -> None:
+def update_review_source(new_text: str = 'Unknown', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """메타데이터와 연결된 리뷰의 source 데이터를 수정
     Args:
-        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
-        dry_run: 실제 실행 여부
         new_text: 대체할 문자
+        dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
@@ -360,13 +361,13 @@ def update_review_source(con: sqlite3.Connection, dry_run: bool = config.dry_run
 
 
 @retrieve_db
-def update_clip_key(search: str, replace: str, con: sqlite3.Connection, dry_run: bool = config.dry_run) -> None:
+def update_clip_key(search: str, replace: str, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """부가 영상의 url을 수정
     Args:
         search: 찾을 내용
         replace: 바꿀 내용
-        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
         dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
@@ -392,3 +393,62 @@ def update_clip_key(search: str, replace: str, con: sqlite3.Connection, dry_run:
             execute_queries.append("UPDATE media_parts SET extra_data = '" + extra_data_json.replace("'", "''") + f"' WHERE id={row.get('id')}")
     if not dry_run and execute_queries:
         execute_batch(execute_queries)
+
+
+def get_bundle_path(hash: str, metadata_type: str, metadata_path: str = config.metadata) -> pathlib.Path:
+    if metadata_type == 1:
+        content_type = 'Movies'
+    elif metadata_type in (2, 3, 4):
+        content_type = 'TV Shows'
+    else:
+        return None
+    return pathlib.Path(metadata_path) / content_type / hash[0] / f"{hash[1:]}.bundle"
+
+
+def get_ancestors(row: dict, con: sqlite3.Connection) -> pathlib.Path:
+    parent_row = None
+    grand_parent_row = None
+    if row['metadata_type'] in (3, 4):
+        parent_row = con.execute(
+            f"SELECT * FROM metadata_items WHERE id = ?",
+            (row['parent_id'],)
+        ).fetchone()
+        if row['metadata_type'] == 4:
+            grand_parent_row = con.execute(
+                f"SELECT * FROM metadata_items WHERE id = ?",
+                (parent_row['parent_id'],)
+            ).fetchone()
+        hash = grand_parent_row['hash'] if row['metadata_type'] == 4 else parent_row['hash']
+    else:
+        hash = row['hash']
+    return hash, parent_row, grand_parent_row
+
+
+@retrieve_db
+async def clean_bundle(metadata_id: int, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+    """메타데이터 번들 폴더를 삭제 후 새로고침
+    Args:
+        metadata_id: 메타데이터 아이디
+        dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+    Returns:
+        None:
+    Examples:
+        >>> prune_metadata(metadata_id=1, dry_run=True)
+    """
+    query = f"SELECT * FROM metadata_items WHERE id = {metadata_id}"
+    metadata = con.execute(query).fetchone()
+    if not metadata:
+        logger.warning(f"존재하지 않는 메타데이터: {metadata_id}")
+        return
+    if not  metadata['metadata_type'] in (1, 2):
+        logger.warning(f"영화와 TV 쇼의 메타데이터만 처리 가능합니다: {metadata_id}")
+        return
+    path_bundle = get_bundle_path(metadata['hash'], metadata['metadata_type'])
+    if not dry_run:
+        logger.info(f'번들 삭제: {metadata_id} ({path_bundle})')
+        shutil.rmtree(path_bundle)
+        logger.info(f'새로고침: {metadata_id}')
+        start = int(time.time())
+        result = await refresh(metadata_id)
+        await check_update(metadata_id, result, start)

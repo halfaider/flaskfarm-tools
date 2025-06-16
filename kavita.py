@@ -31,18 +31,18 @@ def scan_folder(folder: str, url: str = config.url, apikey: str = config.apikey)
 
 
 @retrieve_db
-def fetch_one(query: str, con: sqlite3.Connection) -> dict:
+def fetch_one(query: str, con: sqlite3.Connection = None) -> dict:
     return con.execute(query).fetchone()
 
 
 @retrieve_db
-def fetch_all(query: str, con: sqlite3.Connection) -> Generator[dict, None, None]:
+def fetch_all(query: str, con: sqlite3.Connection = None) -> Generator[dict, None, None]:
     for row in con.execute(query):
         yield row
 
 
 @retrieve_db
-def execute(query: str, con: sqlite3.Connection, params: Sequence[str] = None) -> None:
+def execute(query: str, params: Sequence[str] = None, con: sqlite3.Connection = None) -> None:
     if params:
         con.execute(query, *params)
     else:
