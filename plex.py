@@ -93,7 +93,7 @@ def get_media_parts_by_metadata_id(metadata_id: int, con: sqlite3.Connection = N
 
 
 @http_api
-def delete_media(meta_id: int, media_id: int, url: str = config.url) -> dict:
+async def delete_media(meta_id: int, media_id: int, url: str = config.url) -> dict:
     return {
         "url": urllib.parse.urljoin(url, f"/library/metadata/{meta_id}/media/{media_id}"),
         "method": "DELETE",
@@ -101,7 +101,7 @@ def delete_media(meta_id: int, media_id: int, url: str = config.url) -> dict:
 
 
 @http_api
-def empty_trash(section_id: int = -1, url: str = config.url) -> tuple[bool, str]:
+async def empty_trash(section_id: int = -1, url: str = config.url) -> tuple[bool, str]:
     return {
         "url": urllib.parse.urljoin(url, f"/library/sections/{section_id}/emptyTrash"),
         "method": "PUT",
@@ -109,7 +109,7 @@ def empty_trash(section_id: int = -1, url: str = config.url) -> tuple[bool, str]
 
 
 @http_api
-def matches(metadata_id: int,
+async def matches(metadata_id: int,
             title: str,
             year: int = None,
             agent: str = None,
@@ -135,7 +135,7 @@ def matches(metadata_id: int,
 
 
 @http_api
-def match(metadata_id: int = -1, guid: str = None, name: str = None, year: int = None, url: str = config.url) -> dict:
+async def match(metadata_id: int = -1, guid: str = None, name: str = None, year: int = None, url: str = config.url) -> dict:
     params = {
         'guid': guid,
         'name': name,
@@ -150,7 +150,7 @@ def match(metadata_id: int = -1, guid: str = None, name: str = None, year: int =
 
 
 @http_api
-def refresh(metadata_id: int, url: str = config.url) -> dict:
+async def refresh(metadata_id: int, url: str = config.url) -> dict:
     return {
         'url': urllib.parse.urljoin(url, f"/library/metadata/{metadata_id}/refresh"),
         'method': 'PUT',
@@ -158,7 +158,7 @@ def refresh(metadata_id: int, url: str = config.url) -> dict:
 
 
 @http_api
-def analyze(metadata_id: int, url: str = config.url) -> dict:
+async def analyze(metadata_id: int, url: str = config.url) -> dict:
     return {
         'url': urllib.parse.urljoin(url, f"/library/metadata/{metadata_id}/analyze"),
         'method': 'PUT',
@@ -166,7 +166,7 @@ def analyze(metadata_id: int, url: str = config.url) -> dict:
 
 
 @http_api
-def scan(section_id: int, path: str = None, cancel: bool = False, url: str = config.url) -> dict:
+async def scan(section_id: int, path: str = None, cancel: bool = False, url: str = config.url) -> dict:
     params = {'path': path} if path else None
     return {
         'url': urllib.parse.urljoin(url, f"/library/sections/{section_id}/refresh"),

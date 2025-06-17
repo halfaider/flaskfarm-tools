@@ -196,7 +196,7 @@ def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
     def decorator(func: Callable) -> Coroutine:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwds: Any) -> dict:
-            api: dict = func(*args, **kwds) or {}
+            api: dict = await func(*args, **kwds) or {}
             params: dict = api.get('params')
             data: dict = api.get('data')
             json_: dict = api.get('json')
@@ -218,7 +218,7 @@ def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
                         result['url'] = response.url
                         if response.content:
                             result['text'] = await response.text()
-                        if response.content and response.content_type == 'application/json':
+                        if response.content and (response.content_type or '').lower() == 'application/json':
                             result['json'] = await response.json()
                 except Exception as e:
                     logger.warning(repr(e))
@@ -238,3 +238,7 @@ def apply_cache(func: Callable, maxsize: int = 64) -> Callable:
 
 def get_ttl_hash(seconds: int = 3600) -> int:
     return round(time.time() / seconds)
+
+
+def string_bool(value: Any, true: str = 'true', false: str = 'false') -> str:
+    return true if value else false

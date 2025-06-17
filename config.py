@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import copy
 import json
@@ -122,6 +123,17 @@ class _KavitaConfig:
     url: str
     apikey: str
     db: str = None
+    ignore_cover_patterns: Sequence[str] = ('text.png',)
+    tables_with_cover : Sequence[str] = (
+        'Library',
+        'Series',
+        'Volume',
+        'Chapter',
+        'CollectionTag',
+        'ReadingList',
+        'AppUserCollection',
+    )
+    plugin_name: str = 'flaskfarm-tools'
 
 
 @dataclasses.dataclass
@@ -129,6 +141,10 @@ class KavitaConfig(_BaseConfig, _KavitaConfig):
     def __post_init__(self) -> None:
         if not self.url or not self.apikey:
             raise Exception('url 또는 apikey 값이 없습니다.')
+        if self.ignore_cover_patterns:
+            self.ignore_cover_patterns = tuple(re.compile(pattern) for pattern in self.ignore_cover_patterns)
+        else:
+            self.ignore_cover_patterns = ()
 
 
 @dataclasses.dataclass

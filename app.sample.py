@@ -11,10 +11,11 @@ import sqlite3
 import asyncio
 from typing import Any
 
+import config
 import plex
 import plex_update_metamedia
 import plex_rematch
-import config
+import kavita
 from helpers import mem_usage
 
 logger = logging.getLogger(__name__)
@@ -130,14 +131,43 @@ async def main(*args: Any, **kwds: Any) -> None:
     #print(result)
 
     """
-    Kavita
+    Kavita 커버 파일 분산
+    covers 폴더 하나에 너무 많은 커버 이미지 파일이 집중되는 것을 방지하기 위해서
+    가능할 경우 각 라이브러리 폴더에 커버 이미지 파일을 분산"""
+    #kavita.organize_covers('/mnt/cloud/kavita/covers', dry_run=False)
+
     """
-    #import kavita
+    Kavita 커버 파일 정리
+    사용하지 않는 커버 파일을 찾아서 삭제"""
+    #kavita.clean_covers('/mnt/cloud/kavita/covers', dry_run=False)
+
+    """
+    Kavita 폴더 스캔
+    해당 폴더를 포함하는 라이브러리를 스캔"""
     #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가')
 
-    #rows = kavita.fetch_all('SELECT * FROM series LIMIT 10')
+    """
+    Kavita 경로로 시리즈 스캔
+    하나의 시리즈만 검색 되도록 경로를 지정"""
+    #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False)
+
+    """
+    Kavita 모든 라이브러리를 스캔"""
+    #await kavita.scan_all()
+
+    """
+    Kavita 특정 라이브러리만 스캔"""
+    #await kavita.scan(103, force=True)
+
+    """
+    Kavita DB 쿼리 실행"""
+    #row = kavita.fetch_one('SELECT * FROM Library WHERE id = ?, (123,))
+    #print(row)
+    #rows = kavita.fetch_all('SELECT * FROM Library')
     #for row in rows:
     #    print(row)
+    #cs = kavita.execute('SELECT * FROM Series WHERE id = :id', {'id': 12345})
+    #print(cs.fetchone())
 
 
 if __name__ == "__main__":

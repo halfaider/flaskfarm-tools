@@ -14,6 +14,17 @@ kavita:
   url: http://kavita:5000
   apikey: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
   #db: /kavita/config/kavita.db
+  #ignore_cover_patterns:
+  #  - 'text.png'
+  #tables_with_cover:
+  #  - Library
+  #  - Series
+  #  - Volume
+  #  - Chapter
+  #  - CollectionTag
+  #  - ReadingList
+  #  - AppUserCollection
+  #plugin_name: 'flaskfarm-tools'
   #dry_run: true
   #mappings:
   #  /GDRIVE: /mnt/gds2/GDRIVE
