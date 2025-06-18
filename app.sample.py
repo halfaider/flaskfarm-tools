@@ -148,8 +148,13 @@ async def main(*args: Any, **kwds: Any) -> None:
 
     """
     Kavita 경로로 시리즈 스캔
-    하나의 시리즈만 검색 되도록 경로를 지정"""
+    이미 존재하는 하나의 시리즈만 검색 되도록 경로를 지정"""
     #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False)
+
+    """
+    Kavita 시리즈 스캔
+    이미 존재하는 시리즈 ID를 지정하여 스캔"""
+    #await kavita.scan_series(12345)
 
     """
     Kavita 모든 라이브러리를 스캔"""

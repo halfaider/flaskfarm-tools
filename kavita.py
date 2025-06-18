@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sqlite3
 import pathlib
+import datetime
 import urllib.parse
 from typing import Any, Generator, Sequence
 
@@ -65,21 +66,14 @@ async def scan_all(force: bool = False, url: str = config.url, apikey: str = con
 
 
 @http_api
-async def scan_series(library_id: int | str, series_id: int | str, force: bool = False, colorscape: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
+async def scan_series(series_id: int, library_id: int = -1, force: bool = False, colorscape: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
+    if library_id < 1:
+        row = fetch_one('SELECT LibraryId FROM Series WHERE id = ?', (series_id,))
+        if row:
+            library_id = row['LibraryId']
     return {
         'url': urllib.parse.urljoin(url, '/api/Series/scan'),
         'json': {'libraryId': library_id, 'seriesId': series_id, 'forceUpdate': force, 'forceColorscape': colorscape},
-        'method': 'POST',
-        'headers': await get_headers(url=url, apikey=apikey)
-    }
-
-
-@http_api
-async def scan_multiple(library_ids: Sequence[int | str], force: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
-    # 작동 안 하는 듯
-    return {
-        'url': urllib.parse.urljoin(url, '/api/Library/scan-multiple'),
-        'json': {'ids': library_ids, 'force': force},
         'method': 'POST',
         'headers': await get_headers(url=url, apikey=apikey)
     }
@@ -93,7 +87,27 @@ async def scan_series_by_path(path: str, is_dir: bool = False, force: bool = Fal
         logger.error(f'스캔 경로 확인: {str(path)}')
         return
     logger.info(f'Scan: {rows[0]["Name"]}')
-    await scan_series(rows[0]['LibraryId'], rows[0]['Id'], force=force, colorscape=colorscape, url=url, apikey=apikey)
+    await scan_series(rows[0]['Id'], library_id=rows[0]['LibraryId'], force=force, colorscape=colorscape, url=url, apikey=apikey)
+
+
+@http_api
+async def scan_multiple(library_ids: Sequence[int | str], force: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
+    # 작동 안 하는 듯
+    return {
+        'url': urllib.parse.urljoin(url, '/api/Library/scan-multiple'),
+        'json': {'ids': library_ids, 'force': force},
+        'method': 'POST',
+        'headers': await get_headers(url=url, apikey=apikey)
+    }
+
+
+@http_api
+async def jobs(url: str = config.url, apikey: str = config.apikey) -> dict:
+    return {
+        'url': urllib.parse.urljoin(url, '/api/Server/jobs'),
+        'method': 'GET',
+        'headers': await get_headers(url=url, apikey=apikey)
+    }
 
 
 @retrieve_db
@@ -126,7 +140,8 @@ def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
         `l`로 시작하는 cover는 Library 테이블에서만 사용
         id는 실제와 일치하지 않을 수 있음
     Series
-        _s{series_id}.ext
+        s{series_id}.ext 사용자 지정
+        _s{series_id}.ext 자동 생성
         _s11271.png
 
         Volume, Chapter 테이블에서 _s{series_id}.ext 커버를 사용하기도 함
@@ -136,7 +151,7 @@ def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
 
         Series 테이블에서 v{volume_id}_c{chapter_id}.ext 커버를 사용하기도 함
     """
-    queries = [
+    queries = (
         # 1. Library
         "SELECT id as LibraryId FROM Library WHERE CoverImage = ?",
         # 2. Series
@@ -156,7 +171,7 @@ def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
         JOIN Series AS s ON v.SeriesId = s.id
         WHERE c.CoverImage = ?
         """
-    ]
+    )
     if cover.startswith('l'):
         row = con.execute(queries[0], (cover,)).fetchone()
         if row:
@@ -207,7 +222,7 @@ def print_fails(fails: list[tuple[pathlib.Path, str]]) -> None:
 def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """커버 이미지를 각 라이브러리 폴더로 이동. 하위 폴더는 검색하지 않음. 데이터베이스에서 커버 이미지로 라이브러리 ID를 검색한 후 그 ID로 폴더를 생성하여 이동.
     Args:
-        covers: 커버 폴더 위치
+        covers: 커버 폴더 경로
         dry_run: 실제 실행 여부
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
@@ -223,12 +238,10 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
         if should_be_ignored(path):
             # 디렉토리, 공통으로 사용하는 커버는 제외
             continue
-
         library_id = get_library_by_cover(path.name, con=con)
         if library_id < 1:
             # 라이브러리를 알 수 없는 커버는 제외
             continue
-
         new_path = path_covers / f'{library_id}' / path.name
         try:
             if not dry_run and not new_path.parent.exists():
@@ -252,7 +265,7 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
 def clean_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """데이터베이스에서 커버 이미지를 사용중인 레코드가 없으면 삭제
     Args:
-        covers: 커버 폴더 위치
+        covers: 커버 폴더 경로
         dry_run: 실제 실행 여부
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
@@ -279,6 +292,18 @@ def clean_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.d
                 logger.exception(f'삭제 실패: {path}')
                 fails.append((path, str(e)))
     print_fails(fails)
+
+
+def is_updated(series_id: int, start: float) -> bool:
+    # 정확하지 않음
+    timestmap_format = '%Y-%m-%d %H:%M:%S.%f'
+    row = execute("SELECT * FROM Series WHERE Id = ?", (series_id,)).fetchone()
+    if not row:
+        logger.error(f'No series found: {series_id}')
+        return True
+    last_scanned = datetime.datetime.strptime(row['LastFolderScannedUtc'][:-1], timestmap_format).replace(tzinfo=datetime.timezone.utc).timestamp()
+    last_modified = datetime.datetime.strptime(row['LastModifiedUtc'][:-1], timestmap_format).replace(tzinfo=datetime.timezone.utc).timestamp()
+    return max(last_modified, last_scanned) > start
 
 
 async def main(*args: Any, **kwds: Any) -> None:
