@@ -24,9 +24,13 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Plex 포스터 새로고침
     포스터 파일이 삭제되어 포스터 표시가 안 되는 메타데이터 중 포스터 url 정보가 있으면 url로 대체
-    URL이 없을 경우 영화와 쇼는 새로고침, 에피소드는 분석
-    모든 섹션을 지정하려면 -1 입력"""
-    #await plex_update_metamedia.update_metamedia(1)
+    URL이 없을 경우 영화와 쇼는 새로고침, 에피소드는 분석"""
+    # 모든 섹션을 대상으로 실행
+    #await plex_update_metamedia.update_metamedia()
+    # 특정 섹션을 대상으로 실행
+    #await plex_update_metamedia.update_metamedia(section_id=1)
+    # 특정 메타데이터를 대상으로 실행
+    #await plex_update_metamedia.update_metamedia(metadata_id=12345)
 
     """
     Plex 일치항목 일괄 수정
@@ -91,14 +95,14 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Plex 라이브러리를 검색하여 가짜 포스터 파일(None)이 있을 경우 번들 폴더를 삭제 후 새로고침
     메타데이터 새로고침 후 가짜 파일이 선택되어 포스터가 표시 안 될 경우 사용
-    라이브러리 ID를 입력"""
+    섹션 ID를 입력"""
     #await plex.find_and_clean_bundle(1)
 
     """
     Plex DB 쿼리 실행
     조회는 fectch_all() 혹은 fetch_one() 사용
-    DB 수정은 execte(), execute_batch(), execute_gen() 사용
-    connection을 직접 다룰 경우 @plex.retrieve_db 데코레이터 사용"""
+    DB 수정은 execte(), execute_batch() 사용
+    connection 객체를 직접 다룰 경우 @plex.retrieve_db 데코레이터 사용"""
     #query = f"SELECT * FROM metadata_items WHERE metadata_type = 3;"
     #print(plex.fetch_one(query))
 
@@ -159,14 +163,21 @@ async def main(*args: Any, **kwds: Any) -> None:
     #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가')
 
     """
+    Kavita 시리즈 스캔
+    이미 존재하는 시리즈 ID를 지정하여 스캔"""
+    #await kavita.scan_series(12345)
+
+    """
     Kavita 경로로 시리즈 스캔
     이미 존재하는 하나의 시리즈만 검색 되도록 경로를 지정"""
     #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False)
 
     """
-    Kavita 시리즈 스캔
-    이미 존재하는 시리즈 ID를 지정하여 스캔"""
-    #await kavita.scan_series(12345)
+    Kavita 쿼리로 시리즈 스캔
+    쿼리문으로 검색되는 시리즈를 각각 스캔
+    스캔 도중 다른 스캔을 요청하면 10분 딜레이 되기 때문에 각 시리즈 간 스캔 간격을 충분히 두고 실행
+    시리즈의 스캔 완료 여부는 정확하게 판단할 수 없으므로 대략 1분 정도로 설정"""
+    #await kavita.scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60)
 
     """
     Kavita 모든 라이브러리를 스캔"""

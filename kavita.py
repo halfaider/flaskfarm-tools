@@ -297,14 +297,39 @@ def clean_covers(covers: str = '/kavita/config/covers', recursive: bool = True, 
 
 def is_updated(series_id: int, start: float) -> bool:
     # 정확하지 않음
-    timestmap_format = '%Y-%m-%d %H:%M:%S.%f'
+    timestmap_format = '%Y-%m-%d %H:%M:%S.%f%z'
     row = execute("SELECT * FROM Series WHERE Id = ?", (series_id,)).fetchone()
     if not row:
         logger.error(f'No series found: {series_id}')
         return True
-    last_scanned = datetime.datetime.strptime(row['LastFolderScannedUtc'][:-1], timestmap_format).replace(tzinfo=datetime.timezone.utc).timestamp()
-    last_modified = datetime.datetime.strptime(row['LastModifiedUtc'][:-1], timestmap_format).replace(tzinfo=datetime.timezone.utc).timestamp()
+    last_scanned = datetime.datetime.strptime(f"{row['LastFolderScannedUtc'][:-1]}+0000", timestmap_format).timestamp()
+    last_modified = datetime.datetime.strptime(f"{row['LastModifiedUtc'][:-1]}+0000", timestmap_format).timestamp()
     return max(last_modified, last_scanned) > start
+
+
+async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str] = (), interval: int | float = 30.0, check: int | float = 5.0) -> None:
+    """쿼리문으로 시리즈 스캔
+    Args:
+        query: 쿼리문
+        params: 쿼리문 매개변수
+        interval: 각 시리즈 스캔 간격 (초)
+        wait: 업데이트 확인 대기 시간 (초)
+    Returns:
+        None:
+    Examples:
+        >>> scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60)
+    """
+    targets = tuple(fetch_all(query, params))
+    last_index = len(targets) - 1
+    for idx, row in enumerate(targets):
+        start = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        logger.info(f'Scan: {row["Id"]}')
+        await scan_series(row['Id'], library_id=row['LibraryId'])
+        while not is_updated(row['Id'], start):
+            logger.debug(f'Waiting for update: {row["Id"]}')
+            await asyncio.sleep(check)
+        if idx < last_index:
+            await asyncio.sleep(interval)
 
 
 async def main(*args: Any, **kwds: Any) -> None:
