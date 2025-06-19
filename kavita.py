@@ -262,10 +262,11 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
 
 
 @retrieve_db
-def clean_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+def clean_covers(covers: str = '/kavita/config/covers', recursive: bool = True, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """데이터베이스에서 커버 이미지를 사용중인 레코드가 없으면 삭제
     Args:
         covers: 커버 폴더 경로
+        recursive: 하위 폴더 탐색 여부
         dry_run: 실제 실행 여부
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
@@ -277,7 +278,7 @@ def clean_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.d
     """
     path_covers = pathlib.Path(covers)
     fails = []
-    for path in path_covers.rglob('*'):
+    for path in path_covers.rglob('*') if recursive else path_covers.glob('*'):
         if should_be_ignored(path):
             continue
         search_path = str(path.relative_to(path_covers))

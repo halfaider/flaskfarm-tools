@@ -424,8 +424,29 @@ def get_ancestors(row: dict, con: sqlite3.Connection) -> pathlib.Path:
     return hash, parent_row, grand_parent_row
 
 
-@retrieve_db
-async def clean_bundle(metadata_id: int, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+async def delete_bundle(metadata_id: int, bundle: str | pathlib.Path, shoud_refresh: bool = True, dry_run: bool = config.dry_run) -> None:
+    """메타데이터 번들 폴더를 삭제
+    Args:
+        metadata_id: 메타데이터 아이디
+        refrsh: 메타데이터 새로고침 여부
+        dry_run: 실제 실행 여부
+    Returns:
+        None:
+    Examples:
+        >>> delete_bundle(metadata_id=1, refresh=False, dry_run=True)
+    """
+    path_bundle = pathlib.Path(bundle)
+    logger.info(f'번들 삭제: {metadata_id} ({path_bundle})')
+    if not dry_run:
+        shutil.rmtree(path_bundle)
+        if shoud_refresh:
+            logger.info(f'새로고침: {metadata_id}')
+            start = int(time.time())
+            result = await refresh(metadata_id)
+            await check_update(metadata_id, result, start)
+
+
+async def clean_bundle(metadata_id: int, dry_run: bool = config.dry_run) -> None:
     """메타데이터 번들 폴더를 삭제 후 새로고침
     Args:
         metadata_id: 메타데이터 아이디
@@ -436,19 +457,48 @@ async def clean_bundle(metadata_id: int, dry_run: bool = config.dry_run, con: sq
     Examples:
         >>> prune_metadata(metadata_id=1, dry_run=True)
     """
-    query = f"SELECT * FROM metadata_items WHERE id = {metadata_id}"
-    metadata = con.execute(query).fetchone()
+    metadata = fetch_one("SELECT * FROM metadata_items WHERE id = ?", (metadata_id,))
     if not metadata:
         logger.warning(f"존재하지 않는 메타데이터: {metadata_id}")
         return
-    if not  metadata['metadata_type'] in (1, 2):
+    if not metadata['metadata_type'] in (1, 2):
         logger.warning(f"영화와 TV 쇼의 메타데이터만 처리 가능합니다: {metadata_id}")
         return
     path_bundle = get_bundle_path(metadata['hash'], metadata['metadata_type'])
-    if not dry_run:
-        logger.info(f'번들 삭제: {metadata_id} ({path_bundle})')
-        shutil.rmtree(path_bundle)
-        logger.info(f'새로고침: {metadata_id}')
-        start = int(time.time())
-        result = await refresh(metadata_id)
-        await check_update(metadata_id, result, start)
+    delete_bundle(metadata_id, path_bundle, dry_run=dry_run)
+
+
+def find_none_file(root: str | pathlib.Path) -> Generator[pathlib.Path, None, None]:
+    for file in pathlib.Path(root).rglob('*'):
+        if file.is_dir():
+            continue
+        try:
+            with file.open('rb') as f:
+                if f.read(4) == b'None':
+                    yield file
+        except Exception:
+            logger.exception(file)
+
+
+async def find_and_clean_bundle(library_id: int, dry_run: bool = config.dry_run) -> None:
+    """메타데이터 번들 폴더에 가짜 파일(None)이 있을 경우 번들 삭제 후 새로고침
+    Args:
+        library_id: 라이브러리 아이디
+        dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+    Returns:
+        None:
+    Examples:
+        >>> find_and_clean_none_file(library_id=1, dry_run=False)
+    """
+    for row in fetch_all(f"SELECT * FROM metadata_items WHERE library_section_id = {library_id}"):
+        if not row['metadata_type'] in (1, 2):
+            continue
+        path_bundle = get_bundle_path(row['hash'], row['metadata_type'])
+        none_files = tuple(find_none_file(path_bundle))
+        if none_files:
+            logger.info(f'{row["id"]}: {row["title"]} "{path_bundle}"')
+            for idx, none_file in enumerate(none_files):
+                prefix = '└' if idx >= len(none_files) - 1 else '│'
+                logger.debug(f'{prefix} {none_file.relative_to(path_bundle)}')
+            await delete_bundle(row['id'], path_bundle, dry_run=dry_run)

@@ -22,12 +22,14 @@ logger = logging.getLogger(__name__)
 
 async def main(*args: Any, **kwds: Any) -> None:
     """
+    Plex 포스터 새로고침
     포스터 파일이 삭제되어 포스터 표시가 안 되는 메타데이터 중 포스터 url 정보가 있으면 url로 대체
     URL이 없을 경우 영화와 쇼는 새로고침, 에피소드는 분석
     모든 섹션을 지정하려면 -1 입력"""
     #await plex_update_metamedia.update_metamedia(1)
 
     """
+    Plex 일치항목 일괄 수정
     - "title" column 값이 정확히 "인터스텔라"인 데이터:
         SELECT * FROM metadata_items WHERE title = '인터스텔라'
     - 네이버 영화 메타데이터가 입혀진 데이터:
@@ -52,35 +54,45 @@ async def main(*args: Any, **kwds: Any) -> None:
     #await plex_rematch.main_(query)
 
     """
+    Plex 일치항목 강제 수정
     기본 에이전트로 설정된 라이브러리에서 타 에이전트로 강제 매칭을 시도
     매칭 후 메타데이터 새로고침을 하면 원래 에이전트의 데이터로 복구 됨
     """
     #await plex_rematch.force_match_with_agent([104435, 120317], 'com.plexapp.agents.sjva_agent_movie')
 
     """
+    Plex 휴지통 처리
     파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
     마운트 오류로 삭제되는 걸 방지하기 위해 두번째 인자의 경로가 존재할 때만 삭제처리
     모든 섹션을 지정하려면 -1 입력"""
     #await plex.delete_not_exists(12, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중')
 
     """
+    Plex 색인 정리
     라이브러리 색인 목록의 음절을 자음으로 수정
     모든 섹션을 지정하려면 -1 입력"""
     #plex.update_title_sort(1)
 
     """
-    부가 영상의 url을 수정"""
+    Plex 부가 영상의 url을 수정"""
     #plex.update_clip_key('찾을 내용', '바꿀 내용')
 
     """
-    리뷰의 source를 수정"""
+    Plex 리뷰의 source를 수정
+    Plex 어플리케이션에서 오류 발생시 실행"""
     #plex.update_review_source()
 
     """
-    번들 폴더를 삭제 후 메타데이터 새로고침
+    Plex 메타데이터의 번들 폴더를 삭제 후 새로고침
     누적된 포스터 목록을 초기화 하는 등의 용도로 사용
     메타데이터 ID를 입력"""
     #await plex.clean_bundle(123456)
+
+    """
+    Plex 라이브러리를 검색하여 가짜 포스터 파일(None)이 있을 경우 번들 폴더를 삭제 후 새로고침
+    메타데이터 새로고침 후 가짜 파일이 선택되어 포스터가 표시 안 될 경우 사용
+    라이브러리 ID를 입력"""
+    #await plex.find_and_clean_bundle(1)
 
     """
     Plex DB 쿼리 실행
