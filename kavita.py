@@ -1,3 +1,4 @@
+import time
 import asyncio
 import logging
 import sqlite3
@@ -110,20 +111,24 @@ async def jobs(url: str = config.url, apikey: str = config.apikey) -> dict:
     }
 
 
-@retrieve_db
-def fetch_one(query: str, params: Sequence[str] | dict[str, str] = (), con: sqlite3.Connection = None) -> dict:
-    return con.execute(query, params).fetchone()
+def fetch_one(query: str, params: Sequence[str] | dict[str, str] = ()) -> dict:
+    return execute(query, params).fetchone()
 
 
-@retrieve_db
-def fetch_all(query: str, params: Sequence[str] | dict[str, str] = (), con: sqlite3.Connection = None) -> Generator[dict, None, None]:
-    for row in con.execute(query, params):
+def fetch_all(query: str, params: Sequence[str] | dict[str, str] = ()) -> Generator[dict, None, None]:
+    for row in execute(query, params):
         yield row
 
 
 @retrieve_db
-def execute(query: str, params: Sequence[str] | dict[str, str] = (), con: sqlite3.Connection = None) -> sqlite3.Cursor:
-    return con.execute(query, params)
+def execute(query: str, params: Sequence[str] | dict[str, str] = (), retry_count: int = config.retry, con: sqlite3.Connection = None) -> sqlite3.Cursor:
+    for idx in range(retry_count):
+        try:
+           return con.execute(query, params)
+        except Exception as e:
+            logger.exception(f'Retry ({idx})')
+            time.sleep(5)
+    raise Exception(f'Max retry count exceeded: {query}')
 
 
 def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
@@ -234,6 +239,7 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
     """
     path_covers = pathlib.Path(covers)
     fails = []
+    library_ids = set()
     for path in path_covers.glob('*'):
         if should_be_ignored(path):
             # 디렉토리, 공통으로 사용하는 커버는 제외
@@ -242,6 +248,7 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
         if library_id < 1:
             # 라이브러리를 알 수 없는 커버는 제외
             continue
+        library_ids.add(library_id)
         new_path = path_covers / f'{library_id}' / path.name
         try:
             if not dry_run and not new_path.parent.exists():
@@ -252,13 +259,37 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
                 path.rename(new_path)
             new_value = f'{library_id}/{path.name}'
             logger.info(f'Update CoverImage with {new_value}')
-            for table in config.tables_with_cover:
-                if not dry_run:
+            if not dry_run:
+                for table in config.tables_with_cover:
                     con.execute(f'UPDATE {table} SET CoverImage = ? WHERE CoverImage = ?', (new_value, path.name))
+        except KeyboardInterrupt as e:
+            logger.exception(f'사용자 중단: {path}')
+            break
         except Exception as e:
-            logger.exception(f'커버 정리 실패: {path}')
+            logger.exception(f'커버 정리 실패: {path.name}')
             fails.append((path, str(e)))
+    else:
+        for library_id in library_ids:
+            fix_cover_path(library_id)
     print_fails(fails)
+
+
+@retrieve_db
+def fix_cover_path(library_id: int, con: sqlite3.Connection = None) -> None:
+    finding = f"{library_id}/%"
+    query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage NOT LIKE ?"
+    query_update = "UPDATE {table} SET CoverImage = ? WHERE Id = ?"
+
+    def update_cover(table: str, row: dict) -> None:
+        try:
+            con.execute(query_update.format(table=table), (f"{library_id}/{row['CoverImage']}", row['Id']))
+        except Exception as e:
+            logger.exception(f'{table}: {row["Id"]}')
+
+    for row in fetch_all(f"{query_select.format(table='Series')} AND LibraryId = ?", (finding, library_id)):
+        update_cover('Series', row)
+        for vol_row in fetch_all(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])):
+            update_cover('Volume', vol_row)
 
 
 @retrieve_db
@@ -330,6 +361,39 @@ async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str
             await asyncio.sleep(check)
         if idx < last_index:
             await asyncio.sleep(interval)
+
+
+async def scan_no_cover(library_id: int, covers: str = '/kavita/config/covers') -> None:
+    """DB에 입력된 커버 이미지가 존재하지 않을 경우 업데이트
+    Args:
+        library_id: 라이브러리 ID
+        covers: 커버 폴더 경로
+    Returns:
+        None:
+    Examples:
+        >>> scan_no_cover(101, covers='/mnt/kavita/covers')
+    """
+    series = set()
+    for row in fetch_all(f'SELECT Id, CoverImage FROM Series WHERE LibraryId = ?', (library_id,)):
+        if row['CoverImage']:
+            path = pathlib.Path(covers) / row['CoverImage']
+            if not path.exists():
+                logger.info(f'Series {row["Id"]}: {path}')
+                series.add(row['Id'])
+        else:
+            logger.info(f'Series {row["Id"]}: None')
+            series.add(row['Id'])
+        for vol_row in fetch_all(f'SELECT Id, CoverImage, SeriesId FROM Volume WHERE SeriesId = ?', (row['Id'],)):
+            if vol_row['CoverImage']:
+                vol_path = pathlib.Path(covers) / vol_row['CoverImage']
+                if not vol_path.exists():
+                    logger.info(f'Volume {vol_row["Id"]}: {vol_path}')
+                    series.add(vol_row['SeriesId'])
+            else:
+                logger.info(f'Volume {vol_row["Id"]}: None')
+                series.add(vol_row['SeriesId'])
+    placeholders = ','.join('?' * len(series))
+    await scan_series_by_query(f'SELECT * FROM Series WHERE Id IN ({placeholders})', tuple(series))
 
 
 async def main(*args: Any, **kwds: Any) -> None:

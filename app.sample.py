@@ -149,17 +149,29 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Kavita 커버 파일 분산
     covers 폴더 하나에 너무 많은 커버 이미지 파일이 집중되는 것을 방지하기 위해서
-    가능할 경우 각 라이브러리 폴더에 커버 이미지 파일을 분산"""
+    가능할 경우 각 라이브러리 폴더에 커버 이미지 파일을 분산
+
+    covers/
+       101/
+          _s1234554.jpg
+       102/
+          v1234_c1234.jpg
+        text.png
+
+    DB를 수정하는 작업이 포함되어 있기 때문에 반드시 kavita를 종료 후 실행
+    covers 경로는 스크립트가 접근 가능한 경로"""
     #kavita.organize_covers('/mnt/cloud/kavita/covers', dry_run=False)
 
     """
     Kavita 커버 파일 정리
-    사용하지 않는 커버 파일을 찾아서 삭제"""
+    covers 경로의 파일이 DB에서 사용되지 않을 경우 삭제
+    covers 경로는 스크립트가 접근 가능한 경로"""
     #kavita.clean_covers('/mnt/cloud/kavita/covers', dry_run=False)
 
     """
     Kavita 폴더 스캔
-    해당 폴더를 포함하는 라이브러리를 스캔"""
+    해당 폴더를 포함하는 라이브러리를 스캔
+    대상 폴더는 카비타에서 접근 가능한 경로"""
     #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가')
 
     """
@@ -169,13 +181,14 @@ async def main(*args: Any, **kwds: Any) -> None:
 
     """
     Kavita 경로로 시리즈 스캔
-    이미 존재하는 하나의 시리즈만 검색 되도록 경로를 지정"""
+    이미 존재하는 하나의 시리즈만 검색 되도록 경로를 지정
+    대상 폴더는 카비타에서 접근 가능한 경로"""
     #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False)
 
     """
     Kavita 쿼리로 시리즈 스캔
-    쿼리문으로 검색되는 시리즈를 각각 스캔
-    스캔 도중 다른 스캔을 요청하면 10분 딜레이 되기 때문에 각 시리즈 간 스캔 간격을 충분히 두고 실행
+    쿼리문으로 검색되는 시리즈를 모두 스캔
+    스캔 도중 다른 스캔을 요청하면 10분 딜레이 되기 때문에 각 시리즈 간 스캔 간격(interval)을 충분히 두고 실행
     시리즈의 스캔 완료 여부는 정확하게 판단할 수 없으므로 대략 1분 정도로 설정"""
     #await kavita.scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60)
 
@@ -186,6 +199,14 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Kavita 특정 라이브러리만 스캔"""
     #await kavita.scan(103, force=True)
+
+    """
+    Kavita DB의 커버 파일 경로가 존재하지 않으면 스캔
+    covers 폴더 경로는 스크립트가 접근 가능한 경로
+    라이브러리 id를 지정하여 실행"""
+    #await kavita.scan_no_cover(110, '/mnt/cloud/teldrive/kavita/covers')
+    #for lib_id in range(111, 130):
+    #    await kavita.scan_no_cover(lib_id, '/mnt/cloud/teldrive/kavita/covers')
 
     """
     Kavita DB 쿼리 실행"""
