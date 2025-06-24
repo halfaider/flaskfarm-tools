@@ -158,15 +158,15 @@ def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
     """
     queries = (
         # 1. Library
-        "SELECT id as LibraryId FROM Library WHERE CoverImage = ?",
+        "SELECT id as LibraryId FROM Library WHERE CoverImage LIKE ?",
         # 2. Series
-        "SELECT LibraryId FROM Series WHERE CoverImage = ?",
+        "SELECT LibraryId FROM Series WHERE CoverImage LIKE ?",
         # 3. Volume
         """
         SELECT s.LibraryId
         FROM Volume AS v
         JOIN Series AS s ON v.SeriesId = s.id
-        WHERE v.CoverImage = ?
+        WHERE v.CoverImage LIKE ?
         """,
         # 4. Chapter
         """
@@ -174,7 +174,7 @@ def get_library_by_cover(cover: str, con: sqlite3.Connection = None) -> int:
         FROM Chapter AS c
         JOIN Volume AS v ON c.VolumeId = v.id
         JOIN Series AS s ON v.SeriesId = s.id
-        WHERE c.CoverImage = ?
+        WHERE c.CoverImage LIKE ?
         """
     )
     if cover.startswith('l'):
@@ -224,7 +224,7 @@ def print_fails(fails: list[tuple[pathlib.Path, str]]) -> None:
 
 
 @retrieve_db
-def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """커버 이미지를 각 라이브러리 폴더로 이동. 하위 폴더는 검색하지 않음. 데이터베이스에서 커버 이미지로 라이브러리 ID를 검색한 후 그 ID로 폴더를 생성하여 이동.
     Args:
         covers: 커버 폴더 경로
@@ -240,14 +240,18 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
     path_covers = pathlib.Path(covers)
     fails = []
     library_ids = set()
+    counter = 0
     for path in path_covers.glob('*'):
         if should_be_ignored(path):
             # 디렉토리, 공통으로 사용하는 커버는 제외
             continue
-        library_id = get_library_by_cover(path.name, con=con)
+        library_id = get_library_by_cover(f'%{path.name}', con=con)
         if library_id < 1:
             # 라이브러리를 알 수 없는 커버는 제외
             continue
+        if quantity >= 0 and quantity <= counter:
+            break
+        counter += 1
         library_ids.add(library_id)
         new_path = path_covers / f'{library_id}' / path.name
         try:
@@ -268,14 +272,11 @@ def organize_covers(covers: str = '/kavita/config/covers', dry_run: bool = confi
         except Exception as e:
             logger.exception(f'커버 정리 실패: {path.name}')
             fails.append((path, str(e)))
-    else:
-        for library_id in library_ids:
-            fix_cover_path(library_id)
     print_fails(fails)
 
 
 @retrieve_db
-def fix_cover_path(library_id: int, con: sqlite3.Connection = None) -> None:
+def fix_organized_covers(library_id: int, con: sqlite3.Connection = None) -> None:
     finding = f"{library_id}/%"
     query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage NOT LIKE ?"
     query_update = "UPDATE {table} SET CoverImage = ? WHERE Id = ?"
@@ -399,6 +400,35 @@ async def scan_no_cover(library_id: int, covers: str = '/kavita/config/covers') 
 async def main(*args: Any, **kwds: Any) -> None:
     result = await plugin_authenticate()
     print(result)
+
+
+@retrieve_db
+def undo_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/kavita/config/covers', con: sqlite3.Connection = None) -> None:
+    path_covers = pathlib.Path(covers)
+    for lib_id in library_ids:
+        path_lib = path_covers / str(lib_id)
+        if not path_lib.exists():
+            continue
+        for path in path_lib.glob('*'):
+            new_path = path_covers / path.name
+            path.rename(new_path)
+            logger.info(new_path)
+
+    query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage LIKE ?"
+    query_update = "UPDATE {table} SET CoverImage = ? WHERE Id = ?"
+    finding = '%/%'
+    def update_cover(table: str, row: dict) -> None:
+        try:
+            con.execute(query_update.format(table=table), (f"{row['CoverImage'].split('/')[1]}", row['Id']))
+        except Exception as e:
+            logger.exception(f'{table}: {row["Id"]}')
+    for lib_id in library_ids:
+        lib_row = con.execute(f"{query_select.format(table='Library')} AND Id = ?", (finding, lib_id)).fetchone()
+        update_cover('Library', lib_row)
+        for row in con.execute(f"{query_select.format(table='Series')} AND LibraryId = ?", (finding, lib_id)).fetchall():
+            update_cover('Series', row)
+            for vol_row in con.execute(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])).fetchall():
+                update_cover('Volume', vol_row)
 
 
 if __name__ == '__main__':

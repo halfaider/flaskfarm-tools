@@ -159,8 +159,21 @@ async def main(*args: Any, **kwds: Any) -> None:
         text.png
 
     DB를 수정하는 작업이 포함되어 있기 때문에 반드시 kavita를 종료 후 실행
+    covers 경로는 스크립트가 접근 가능한 경로
+    한번에 실행할 파일 개수를 quantity로 지정(-1은 모든 파일)"""
+    #kavita.organize_covers('/mnt/cloud/kavita/covers', quantity=10, dry_run=False)
+
+    """
+    Kavita 커버 파일은 이동 되었는데 DB 업데이트가 안됐을 경우 실행
+    DB의 CoverImage 값이 '{cover_image}'이면 '{library_id}/{cover_image}' 형식으로 업데이트
+    라이브러리 ID를 입력"""
+    #kavita.fix_organized_covers(101)
+
+    """
+    Kaviat 커버 파일 분산 복구
+    각 라이브러리 폴더의 파일을 다시 covers 폴더로 이동 후 DB 업데이트
     covers 경로는 스크립트가 접근 가능한 경로"""
-    #kavita.organize_covers('/mnt/cloud/kavita/covers', dry_run=False)
+    #kavita.undo_organized_covers('/mnt/cloud/kavita/covers')
 
     """
     Kavita 커버 파일 정리
