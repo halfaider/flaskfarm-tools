@@ -276,23 +276,30 @@ def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, d
 
 
 @retrieve_db
-def fix_organized_covers(library_id: int, con: sqlite3.Connection = None) -> None:
-    finding = f"{library_id}/%"
+def fix_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/kavita/config/covers', con: sqlite3.Connection = None) -> None:
+    finding = f"%/%"
     query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage NOT LIKE ?"
     query_update = "UPDATE {table} SET CoverImage = ? WHERE Id = ?"
+    path_covers = pathlib.Path(covers)
 
-    def update_cover(table: str, row: dict) -> None:
+    def update_cover(table: str, library_id: int, row: dict) -> None:
         try:
-            con.execute(query_update.format(table=table), (f"{library_id}/{row['CoverImage']}", row['Id']))
+            cover_image = row.get('CoverImage') or ''
+            new_path = path_covers / f'{library_id}' / cover_image
+            if new_path.exists():
+                con.execute(query_update.format(table=table), (f"{library_id}/{cover_image}", row['Id']))
         except Exception as e:
             logger.exception(f'{table}: {row["Id"]}')
 
-    for row in fetch_all(f"{query_select.format(table='Series')} AND LibraryId = ?", (finding, library_id)):
-        update_cover('Series', row)
-        for vol_row in fetch_all(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])):
-            update_cover('Volume', vol_row)
-            for ch_row in fetch_all(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (finding, vol_row['Id'])):
-                update_cover('Chapter', ch_row)
+    for library_id in library_ids:
+        lib_row = con.execute(f"{query_select.format(table='Library')} AND Id = ?", (finding, library_id)).fetchone()
+        update_cover('Library', library_id, lib_row)
+        for row in con.execute(f"{query_select.format(table='Series')} AND LibraryId = ?", (finding, library_id)).fetchall():
+            update_cover('Series', library_id, row)
+            for vol_row in con.execute(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])).fetchall():
+                update_cover('Volume', library_id, vol_row)
+                for ch_row in con.execute(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (finding, vol_row['Id'])).fetchall():
+                    update_cover('Chapter', library_id, ch_row)
 
 
 @retrieve_db
