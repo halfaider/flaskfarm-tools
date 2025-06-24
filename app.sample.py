@@ -172,8 +172,9 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Kaviat 커버 파일 분산 복구
     각 라이브러리 폴더의 파일을 다시 covers 폴더로 이동 후 DB 업데이트
-    covers 경로는 스크립트가 접근 가능한 경로"""
-    #kavita.undo_organized_covers('/mnt/cloud/kavita/covers')
+    covers 경로는 스크립트가 접근 가능한 경로
+    라이브러리 ID를 여러 개 지정"""
+    #kavita.undo_organized_covers([101], '/kavita/config-test/covers')
 
     """
     Kavita 커버 파일 정리
