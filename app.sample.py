@@ -166,15 +166,15 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Kavita 커버 파일은 이동 되었는데 DB 업데이트가 안됐을 경우 실행
     DB의 CoverImage 값이 '{cover_image}'이면 '{library_id}/{cover_image}' 형식으로 업데이트
-    라이브러리 ID를 입력"""
-    #kavita.fix_organized_covers(101)
+    라이브러리 ID를 여러 개 입력"""
+    #kavita.fix_organized_covers([101, 102], '/mnt/cloud/kavita/covers')
 
     """
-    Kaviat 커버 파일 분산 복구
+    Kavita 커버 파일 분산 복구
     각 라이브러리 폴더의 파일을 다시 covers 폴더로 이동 후 DB 업데이트
     covers 경로는 스크립트가 접근 가능한 경로
     라이브러리 ID를 여러 개 지정"""
-    #kavita.undo_organized_covers([101], '/kavita/config-test/covers')
+    #kavita.undo_organized_covers([101], '/mnt/cloud/kavita/covers')
 
     """
     Kavita 커버 파일 정리
