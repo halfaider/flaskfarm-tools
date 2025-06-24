@@ -291,6 +291,8 @@ def fix_organized_covers(library_id: int, con: sqlite3.Connection = None) -> Non
         update_cover('Series', row)
         for vol_row in fetch_all(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])):
             update_cover('Volume', vol_row)
+            for ch_row in fetch_all(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (finding, vol_row['Id'])):
+                update_cover('Chapter', ch_row)
 
 
 @retrieve_db
@@ -429,6 +431,8 @@ def undo_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '
             update_cover('Series', row)
             for vol_row in con.execute(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])).fetchall():
                 update_cover('Volume', vol_row)
+                for ch_row in con.execute(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (finding, vol_row['Id'])).fetchall():
+                    update_cover('Chapter', ch_row)
 
 
 if __name__ == '__main__':
