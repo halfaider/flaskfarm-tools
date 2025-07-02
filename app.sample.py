@@ -179,8 +179,9 @@ async def main(*args: Any, **kwds: Any) -> None:
     """
     Kavita 커버 파일 정리
     covers 경로의 파일이 DB에서 사용되지 않을 경우 삭제
+    특정 폴더들만 정리할 경우 subs로 지정
     covers 경로는 스크립트가 접근 가능한 경로"""
-    #kavita.clean_covers('/mnt/cloud/kavita/covers', dry_run=False)
+    #kavita.clean_covers('/mnt/cloud/kavita/covers', subs=['101', '102'], recursive=False,dry_run=False)
 
     """
     Kavita 폴더 스캔

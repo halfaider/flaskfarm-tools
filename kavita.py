@@ -303,10 +303,11 @@ def fix_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/
 
 
 @retrieve_db
-def clean_covers(covers: str = '/kavita/config/covers', recursive: bool = True, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+def clean_covers(covers: str = '/kavita/config/covers', subs: Sequence[str] = (), recursive: bool = True, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """데이터베이스에서 커버 이미지를 사용중인 레코드가 없으면 삭제
     Args:
         covers: 커버 폴더 경로
+        sub: covers의 하위 폴더 이름. 특정 폴더만 정리하고 싶을 경우 지정
         recursive: 하위 폴더 탐색 여부
         dry_run: 실제 실행 여부
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
@@ -315,24 +316,37 @@ def clean_covers(covers: str = '/kavita/config/covers', recursive: bool = True, 
         None:
 
     Examples:
-        >>> clean_covers('/docker/volumes/kavita/config/covers', dry_run=True)
+        >>> clean_covers('/docker/volumes/kavita/config/covers', subs='101', recursive=False, dry_run=True)
     """
-    path_covers = pathlib.Path(covers)
+    root_path = pathlib.Path(covers)
+    target_paths = []
+    for sub in subs:
+        sub_path = root_path / sub
+        if sub_path.exists():
+            target_paths.append(sub_path)
+        else:
+            logger.error(f'존재하지 않는 폴더: {sub_path}')
+            return
+
+    if not target_paths:
+        target_paths.append(root_path)
+        
     fails = []
-    for path in path_covers.rglob('*') if recursive else path_covers.glob('*'):
-        if should_be_ignored(path):
-            continue
-        search_path = str(path.relative_to(path_covers))
-        logger.debug(f'Search: {search_path}')
-        if is_cover_used(search_path, con=con):
-            continue
-        logger.info(f'Remove: {path}')
-        if not dry_run:
-            try:
-                path.unlink()
-            except Exception as e:
-                logger.exception(f'삭제 실패: {path}')
-                fails.append((path, str(e)))
+    for target_path in target_paths:
+        for path in target_path.rglob('*') if recursive else target_path.glob('*'):
+            if should_be_ignored(path):
+                continue
+            search_path = str(path.relative_to(root_path))
+            logger.debug(f'Search: {search_path}')
+            if is_cover_used(search_path, con=con):
+                continue
+            logger.info(f'Remove: {path}')
+            if not dry_run:
+                try:
+                    path.unlink()
+                except Exception as e:
+                    logger.exception(f'삭제 실패: {path}')
+                    fails.append((path, str(e)))
     print_fails(fails)
 
 
