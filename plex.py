@@ -175,6 +175,14 @@ async def scan(section_id: int, path: str = None, cancel: bool = False, url: str
     }
 
 
+@http_api
+async def get_sections(url: str = config.url) -> dict:
+    return {
+        'url': urllib.parse.urljoin(url, f"/library/sections"),
+        'method': 'GET',
+    }
+
+
 async def is_updated(metadata_id: int, start: float) -> bool:
     row = get_metadata_by_id(metadata_id)
     if not row:
