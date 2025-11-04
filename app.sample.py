@@ -65,11 +65,20 @@ async def main(*args: Any, **kwds: Any) -> None:
     #await plex_rematch.force_match_with_agent([104435, 120317], 'com.plexapp.agents.sjva_agent_movie')
 
     """
-    Plex 휴지통 처리
+    Plex 휴지통 처리 I
     파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
+    media_parts에 등록된 경로가 유효한지 검사 후 처리
     마운트 오류로 삭제되는 걸 방지하기 위해 두번째 인자의 경로가 존재할 때만 삭제처리
     모든 섹션을 지정하려면 -1 입력"""
-    #await plex.delete_not_exists(12, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중')
+    #await plex.delete_not_exists(12, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중', dry_run=True, print_exists=False)
+
+    """
+    Plex 휴지통 처리 II
+    directories에 등록된 경로가 유효한지 검사 후 처리
+    그 과정에서 휴지통 비우기로 처리되지 않는 미디어가 정리됨
+    마운트 오류로 삭제되는 걸 방지하기 위해 두번째 인자의 경로가 존재할 때만 처리
+    모든 섹션을 지정하려면 -1 입력"""
+    #await plex.prune_directories(1, '/mnt/cloud/gds/GDRIVE/VIDEO/방송중', dry_run=True, print_exists=False)
 
     """
     Plex 색인 정리

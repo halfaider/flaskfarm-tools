@@ -248,7 +248,7 @@ async def delete_not_exists(section_id: int, mount_anchor: str, /, dry_run: bool
     """파일이 삭제되었지만 휴지통 비우기로 처리되지 않는 미디어를 DB에서 삭제
     Args:
         section_id: 섹션 아이디. 모든 섹션을 지정하려면 section_id를 -1로 지정
-        mount_anchor: 폴더 안에 있는 파일을 삭제할 경로. 마운트 오류로 삭제되는 걸 방지하기 위해 mount_anchor로 지정한 경로가 존재할 때만 삭제
+        mount_anchor: mount_anchor로 지정한 경로가 존재할 때만 처리
         dry_run: 실제 실행 여부. 기본값: ``config.yaml``에 정의된 dry_run
         print_exists: 존재하는 파일을 디버그 로그에 출력할 지 여부. 기본값: False
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
@@ -290,6 +290,75 @@ async def delete_not_exists(section_id: int, mount_anchor: str, /, dry_run: bool
             result = await delete_media(row.get('meta_id') or -1, row.get('media_id') or -1)
             if not 300 > result.get('status_code') > 199:
                 logger.warning(f"{idx}. {row['meta_id']}: COULD NOT DELETE: status_code={result.get('status_code')}")
+
+
+@retrieve_db
+async def prune_directories(library_id: int = -1, mount_anchor: str = None, dry_run: bool = config.dry_run, print_exists: bool = False, con: sqlite3.Connection = None) -> None:
+    """데이터베이스의 directories 테이블에 등록된 경로가 유효한지 검사 후 정리
+    Args:
+        library_id: 라이브러리 아이디 (모든 라이브러리에 대해서는 -1)
+        mount_anchor: mount_anchor로 지정한 경로가 존재할 때만 처리
+        dry_run: 실제 적용 여부. 기본값: ``config.yaml``에 정의된 dry_run
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+    Returns:
+        None:
+    Examples:
+        ```
+        prune_directories(library_id=1, mount_anchor="/mnt/gds/VIDEO/방송중", dry_run=True)
+        ```
+    """
+    anchor = pathlib.Path(mount_anchor)
+    limit_query = f" WHERE library_section_id = {library_id}"
+    section_query = "SELECT * FROM section_locations"
+    if int(library_id) > 0:
+        section_query += limit_query
+    section_cursor: sqlite3.Cursor = con.execute(section_query)
+    section_locations = {}
+    for row in section_cursor:
+        if not row.get('root_path'):
+            continue
+        section_id = row['library_section_id']
+        section_locations.setdefault(section_id, [])
+        section_locations[section_id].append(pathlib.Path(row['root_path']))
+    directory_query = "SELECT * FROM directories"
+    if int(library_id) > 0:
+        directory_query += limit_query
+    directory_cursor: sqlite3.Cursor = con.execute(directory_query)
+    update_queries = []
+    update_query = "UPDATE directories SET deleted_at = %d WHERE id = %d"
+    empty_trash_sections = set()
+    for row in directory_cursor:
+        if not row.get('path') and row.get('parent_directory_id'):
+            logger.warning(f"경로가 없습니다: {row}")
+            continue
+        section_id = row['library_section_id']
+        if section_id not in section_locations:
+            logger.warning(f"섹션이 없습니다: {row}")
+            continue
+        root_paths = section_locations.get(section_id)
+        if not root_paths:
+            logger.warning(f"루트 경로가 없습니다: {row}")
+            continue
+        for root_path in root_paths:
+            tmp_path = root_path / row['path']
+            if tmp_path.exists():
+                if print_exists:
+                    logger.info(f"유효한 경로: {tmp_path}")
+                break
+        else:
+            logger.info(f"유효하지 않는 경로: {row}")
+            if not anchor.exists():
+                logger.warning(f"다음 경로가 존재하지 않아 건너 뜁니다: {mount_anchor=}")
+                continue
+            if row.get('deleted_at'):
+                continue
+            update_queries.append(update_query % (int(time.time()), row['id']))
+            empty_trash_sections.add(section_id)
+    if not dry_run and update_queries:
+        execute_batch(update_queries)
+        for section_id in empty_trash_sections:
+            logger.info(f"휴지통 비우기 실행: {section_id}")
+            await empty_trash(section_id)
 
 
 @retrieve_db
