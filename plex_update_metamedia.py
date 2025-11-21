@@ -265,8 +265,6 @@ async def update_metamedia(metadata_id: int | str = None, section_id: int | str 
         select_query += f" AND library_section_id = {section_id}"
     elif query:
         select_query = query
-    else:
-        raise ValueError('metadata_id, section_id, query 중 하나를 지정해야 함')
     await phase_1(con, select_query)
     await phase_2(con, select_query)
     await phase_3(con, select_query)

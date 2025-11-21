@@ -5,6 +5,7 @@ import sqlite3
 import pathlib
 import datetime
 import urllib.parse
+import shutil
 from typing import Any, Generator, Sequence
 
 from config import kavita as config
@@ -224,10 +225,12 @@ def print_fails(fails: list[tuple[pathlib.Path, str]]) -> None:
 
 
 @retrieve_db
-def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, sub_path: str = None, dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
     """커버 이미지를 각 라이브러리 폴더로 이동. 하위 폴더는 검색하지 않음. 데이터베이스에서 커버 이미지로 라이브러리 ID를 검색한 후 그 ID로 폴더를 생성하여 이동.
     Args:
         covers: 커버 폴더 경로
+        quantity: 옮길 파일 갯수를 정해서 부분 실행. 모든 파일: -1
+        sub_path: 이동할 하위 폴더 이름. covers 폴더 아래에 생성
         dry_run: 실제 실행 여부
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
@@ -253,15 +256,25 @@ def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, d
             break
         counter += 1
         library_ids.add(library_id)
-        new_path = path_covers / f'{library_id}' / path.name
+        if sub_path:
+            new_path = path_covers / sub_path / f'{library_id}' / path.name
+        else:
+            new_path = path_covers / f'{library_id}' / path.name
         try:
             if not dry_run and not new_path.parent.exists():
                 logger.debug(f'Create: {new_path.parent}')
                 new_path.parent.mkdir(parents=True)
             logger.info(f'{path} -> {new_path}')
             if not dry_run:
-                path.rename(new_path)
-            new_value = f'{library_id}/{path.name}'
+                try:
+                    path.rename(new_path)
+                except OSError as e:
+                    if e.errno == 18:
+                        #logger.warning(f"Cross-device link detected, falling back to shutil.move: {e}")
+                        shutil.move(path, new_path)
+                    else:
+                        raise
+            new_value = str(new_path.relative_to(path_covers))
             logger.info(f'Update CoverImage with {new_value}')
             if not dry_run:
                 for table in config.tables_with_cover:
@@ -276,29 +289,55 @@ def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, d
 
 
 @retrieve_db
-def fix_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/kavita/config/covers', con: sqlite3.Connection = None) -> None:
-    finding = f"%/%"
-    query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage NOT LIKE ?"
+def fix_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/kavita/config/covers', sub_path: str = None, cover_image_like: str = '%.png', dry_run: bool = config.dry_run, con: sqlite3.Connection = None) -> None:
+    """커버 파일은 이동 되었는데 DB 업데이트가 안 됐을 경우 실행
+    cover_image_like에 SQL LIKE 패턴을 지정하여 해당 되는 레코드만 업데이트
+
+    Args:
+        library_ids: 라이브러리 ID
+        covers: 커버 폴더 경로
+        sub_path: 커버 폴더 내 하위 폴더 이름
+        cover_image_like: DB에 저장된 커버 파일 이름의 패턴(SQL LIKE)
+        dry_run: 실제 실행 여부
+        con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
+
+    Returns:
+        None:
+
+    Examples:
+        >>> fix_organized_covers([101, 102, 103], covers='/mnt/kavita/covers', sub_path='google', dry_run=True)
+    """
+    query_select = "SELECT Id, CoverImage FROM {table} WHERE CoverImage LIKE ?"
     query_update = "UPDATE {table} SET CoverImage = ? WHERE Id = ?"
     path_covers = pathlib.Path(covers)
 
     def update_cover(table: str, library_id: int, row: dict) -> None:
         try:
+            if not row:
+                return
             cover_image = row.get('CoverImage') or ''
-            new_path = path_covers / f'{library_id}' / cover_image
-            if new_path.exists():
-                con.execute(query_update.format(table=table), (f"{library_id}/{cover_image}", row['Id']))
+            path_image = pathlib.Path(cover_image)
+            new_path = path_covers
+            if sub_path:
+                new_path = new_path / sub_path
+            new_path = new_path / str(library_id) / path_image.name
+            if should_be_ignored(new_path):
+                return
+            relative_path = new_path.relative_to(path_covers)
+            logger.info(f'Update: {cover_image} -> {relative_path}')
+            if not dry_run:
+                con.execute(query_update.format(table=table), (str(relative_path), row['Id']))
         except Exception as e:
             logger.exception(f'{table}: {row["Id"]}')
 
     for library_id in library_ids:
-        lib_row = con.execute(f"{query_select.format(table='Library')} AND Id = ?", (finding, library_id)).fetchone()
+        lib_row = con.execute(f"{query_select.format(table='Library')} AND Id = ?", (cover_image_like, library_id)).fetchone()
         update_cover('Library', library_id, lib_row)
-        for row in con.execute(f"{query_select.format(table='Series')} AND LibraryId = ?", (finding, library_id)).fetchall():
+        for row in con.execute(f"{query_select.format(table='Series')} AND LibraryId = ?", (cover_image_like, library_id)).fetchall():
             update_cover('Series', library_id, row)
-            for vol_row in con.execute(f"{query_select.format(table='Volume')} AND SeriesId = ?", (finding, row['Id'])).fetchall():
+            for vol_row in con.execute(f"{query_select.format(table='Volume')} AND SeriesId = ?", (cover_image_like, row['Id'])).fetchall():
                 update_cover('Volume', library_id, vol_row)
-                for ch_row in con.execute(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (finding, vol_row['Id'])).fetchall():
+                for ch_row in con.execute(f"{query_select.format(table='Chapter')} AND VolumeId = ?", (cover_image_like, vol_row['Id'])).fetchall():
                     update_cover('Chapter', library_id, ch_row)
 
 
@@ -330,7 +369,7 @@ def clean_covers(covers: str = '/kavita/config/covers', subs: Sequence[str] = ()
 
     if not target_paths:
         target_paths.append(root_path)
-        
+
     fails = []
     for target_path in target_paths:
         for path in target_path.rglob('*') if recursive else target_path.glob('*'):

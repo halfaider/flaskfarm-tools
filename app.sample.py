@@ -31,6 +31,8 @@ async def main(*args: Any, **kwds: Any) -> None:
     #await plex_update_metamedia.update_metamedia(section_id=1)
     # 특정 메타데이터를 대상으로 실행
     #await plex_update_metamedia.update_metamedia(metadata_id=12345)
+    # 대상을 쿼리문으로 직접 입력
+    #await plex_update_metamedia.update_metamedia(query="SELECT * FROM metadata_items WHERE metadata_type IN (1, 2, 3, 4)")
 
     """
     Plex 일치항목 일괄 수정
@@ -161,22 +163,27 @@ async def main(*args: Any, **kwds: Any) -> None:
     가능할 경우 각 라이브러리 폴더에 커버 이미지 파일을 분산
 
     covers/
-       101/
-          _s1234554.jpg
-       102/
-          v1234_c1234.jpg
+        sub_path/
+            101/
+                _s1234554.jpg
+            102/
+                v1234_c1234.jpg
         text.png
 
     DB를 수정하는 작업이 포함되어 있기 때문에 반드시 kavita를 종료 후 실행
     covers 경로는 스크립트가 접근 가능한 경로
-    한번에 실행할 파일 개수를 quantity로 지정(-1은 모든 파일)"""
-    #kavita.organize_covers('/mnt/cloud/kavita/covers', quantity=10, dry_run=False)
+    대상 파일의 개수를 제한할 경우 quantity로 지정(-1 은 제한 없이 모든 파일)
+    sub_path를 지정하면 covers/sub_path/101 등의 경로를 생성 후 이동
+    지정하지 않으면 covers/101 등의 경로를 생성 후 이동
+    로컬 경로와 리모트 경로(마운트)를 혼용해서 사용할 필요가 있으면 sub_path를 지정해서 마운트 포인트로 사용
+    예) 새로 생성된 커버 파일은 기본 로컬 경로(covers)에 저장, 이후 스크립트로 정리하면서 리모트(sub_path)로 이동"""
+    #kavita.organize_covers('/mnt/cloud/kavita/covers', quantity=10, sub_path='sub_path', dry_run=True)
 
     """
     Kavita 커버 파일은 이동 되었는데 DB 업데이트가 안됐을 경우 실행
-    DB의 CoverImage 값이 '{cover_image}'이면 '{library_id}/{cover_image}' 형식으로 업데이트
+    DB의 CoverImage 값 중 SQL LIKE 형식이 `cover_image_like`이면 '{sub_path}/{library_id}/{cover_image}' 형식으로 업데이트
     라이브러리 ID를 여러 개 입력"""
-    #kavita.fix_organized_covers([101, 102], '/mnt/cloud/kavita/covers')
+    #kavita.fix_organized_covers([101, 102], '/mnt/cloud/kavita/covers', sub_path='sub_path', cover_image_like='%.png', dry_run=True)
 
     """
     Kavita 커버 파일 분산 복구
