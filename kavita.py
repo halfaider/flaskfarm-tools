@@ -426,7 +426,7 @@ def clean_covers(covers: str = '/kavita/config/covers', subs: Sequence[str] = ()
     print_fails(fails)
 
 
-def is_updated(series_id: int, start: float) -> bool:
+def is_series_updated(series_id: int, start: float) -> bool:
     # 정확하지 않음
     timestmap_format = '%Y-%m-%d %H:%M:%S.%f%z'
     row = execute("SELECT * FROM Series WHERE Id = ?", (series_id,)).fetchone()
@@ -456,8 +456,8 @@ async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str
     for idx, row in enumerate(targets):
         start = datetime.datetime.now(datetime.timezone.utc).timestamp()
         logger.info(f'Scan: {row["Id"]}')
-        await scan_series(row['Id'], library_id=row['LibraryId'], force=force)
-        while not is_updated(row['Id'], start):
+        result = await scan_series(row['Id'], library_id=row['LibraryId'], force=force)
+        while not is_series_updated(row['Id'], start):
             logger.debug(f'Waiting for update: {row["Id"]}')
             await asyncio.sleep(check)
         if idx < last_index:
@@ -469,34 +469,42 @@ async def refresh_series(library_id: int, series_id: int, method: str = 'POST', 
     logger.info(f'시리즈 새로고침: {series_id}')
     result = await series_refresh_metadata(library_id, series_id, method=method, force=force, color_scape=color_scape, url=url, apikey=apikey)
     if 300 > result.get('status_code') > 199:
-        while not is_updated(series_id, start):
+        while not is_series_updated(series_id, start):
             logger.debug(f'시리즈 새로고침 대기중: {series_id}')
             await asyncio.sleep(check)
     else:
         logger.error(f'시리즈 새로고침 실패: {series_id=} status_code={result.get("status_code")}')
 
 
-async def series_refresh_worker(refresh_queue: asyncio.Queue, dry_run: bool = config.dry_run) -> None:
+async def series_scan_worker(scan_queue: asyncio.Queue, interval: int = 60, check: int = 5, dry_run: bool = config.dry_run) -> None:
     scanning = set()
     scanned = set()
 
     while True:
-        library_id, series_id = await refresh_queue.get()
-        logger.debug(f"남은 새로고침 수: {refresh_queue.qsize()}")
+        library_id, series_id = await scan_queue.get()
+        logger.debug(f"남은 새로고침 수: {scan_queue.qsize()}")
         if series_id in scanning or series_id in scanned:
-            refresh_queue.task_done()
+            scan_queue.task_done()
             continue
         scanning.add(series_id)
         try:
             if not dry_run:
-                await refresh_series(library_id, series_id, force=True, check=5)
-            scanned.add(series_id)
+                start = datetime.datetime.now(datetime.timezone.utc).timestamp()
+                logger.info(f'Scan: {series_id}')
+                result = await scan_series(series_id, library_id=library_id, force=True)
+                # 그냥 기다리지 말고 카비타가 알아서 처리하도록...
+                #while not is_series_updated(series_id, start):
+                #    logger.debug(f'Waiting for update: {series_id}')
+                #    await asyncio.sleep(check)
+                #logger.debug(f"Sereis updated: {series_id}")
+                ## 다음 스캔이 바로 시작되면 10분 딜레이 될 수 있으므로 여유를 주고 시작되도록...
+                #await asyncio.sleep(interval)
         finally:
             scanning.remove(series_id)
-            refresh_queue.task_done()
+            scan_queue.task_done()
 
 
-async def check_cover_image(row: sqlite3.Row, refresh_queue: asyncio.Queue, url: str = config.url, apikey: str = config.apikey) -> None:
+async def check_cover_image(row: sqlite3.Row, scan_queue: asyncio.Queue, url: str = config.url, apikey: str = config.apikey) -> None:
     cover_image = row.get('CoverImage')
     library_id = row['LibraryId']
     series_id = row['Id']
@@ -521,10 +529,10 @@ async def check_cover_image(row: sqlite3.Row, refresh_queue: asyncio.Queue, url:
 
     if not is_normal:
         logger.info(f"비정상 커버: {url}/library/{library_id}/series/{series_id}")
-        await refresh_queue.put((library_id, series_id))
+        await scan_queue.put((library_id, series_id))
 
 
-async def refresh_no_cover(library_id: int | None = None, semaphore: int = 10, dry_run: bool = config.dry_run, url: str = config.url, apikey: str = config.apikey) -> None:
+async def scan_no_cover(library_id: int | None = None, semaphore: int = 10, dry_run: bool = config.dry_run, url: str = config.url, apikey: str = config.apikey) -> None:
     """시리즈 및 볼륨의 커버 이미지가 비정상인 경우 해당 시리즈를 refresh 시도
 
     Args:
@@ -537,7 +545,7 @@ async def refresh_no_cover(library_id: int | None = None, semaphore: int = 10, d
     Returns:
         None:
     Examples:
-        >>> refresh_no_cover(101, covers='/kavita/config/covers', semaphore=5, url='http://kavita:5000', apikey='abcdefg')
+        >>> scan_no_cover(101, covers='/kavita/config/covers', semaphore=5, url='http://kavita:5000', apikey='abcdefg')
     """
     count_query = f'SELECT COUNT(*) AS count FROM Series'
     series_query = f'SELECT Id, CoverImage, LibraryId FROM Series'
@@ -547,7 +555,7 @@ async def refresh_no_cover(library_id: int | None = None, semaphore: int = 10, d
     count = fetch_one(count_query, (library_id,) if library_id else ())
     total = int(count['count'])
     series = fetch_all(series_query, (library_id,)if library_id else ())
-    refresh_queue = asyncio.Queue()
+    scan_queue = asyncio.Queue()
     semaphore = asyncio.Semaphore(semaphore)
 
     done = 0
@@ -556,17 +564,17 @@ async def refresh_no_cover(library_id: int | None = None, semaphore: int = 10, d
     async def wrapped_check(row):
         nonlocal done
         async with semaphore:
-            await check_cover_image(row, refresh_queue, url=url, apikey=apikey)
+            await check_cover_image(row, scan_queue, url=url, apikey=apikey)
             async with lock:
                 done += 1
                 #if done <= 100 or total - done <= 100 or done % 100 == 0:
                 #    logger.info(f"{done}/{total} checks completed ({done/total*100:.1f}%)")
                 logger.debug(f"{done}/{total} 확인 완료 ({done/total*100:.1f}%)")
 
-    scan_task = asyncio.create_task(series_refresh_worker(refresh_queue, dry_run=dry_run))
+    scan_task = asyncio.create_task(series_scan_worker(scan_queue, interval=60, check=5,dry_run=dry_run))
     check_tasks = [wrapped_check(row) for row in series]
     await asyncio.gather(*check_tasks)
-    await refresh_queue.join()
+    await scan_queue.join()
     scan_task.cancel()
 
 

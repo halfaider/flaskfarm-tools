@@ -245,12 +245,12 @@ async def main(*args: Any, **kwds: Any) -> None:
     #await kavita.series_refresh_metadata(library_id=103, series_id=12345, force=True, color_scape=False, url='http://kavita:5000', apikey='abcdefg')
 
     """
-    Kavita 시리즈 및 볼륨의 커버 이미지가 비정상인 경우 Refresh Covers 실행
+    Kavita 시리즈 및 볼륨의 커버 이미지가 비정상인 경우 스캔 실행
     DB를 직접 업데이트하는 작업이 아니기 때문에 Kavita 서버가 라이브일 때 실행"""
-    #await kavita.refresh_no_cover(110) # 특정 라이브러리
-    #await kavita.refresh_no_cover() # 전체 라이브러리
+    #await kavita.scan_no_cover(110) # 특정 라이브러리
+    #await kavita.scan_no_cover() # 전체 라이브러리
     #for lib_id in range(111, 130):
-    #    await kavita.refresh_no_cover(lib_id, semaphore=5, dry_run=True, url='http://kavita:5000', apikey='abcdefg')
+    #    await kavita.scan_no_cover(lib_id, semaphore=5, dry_run=True, url='http://kavita:5000', apikey='abcdefg')
 
     """
     Kavita DB 쿼리 실행"""
