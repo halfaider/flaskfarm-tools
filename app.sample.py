@@ -162,6 +162,13 @@ async def main(*args: Any, **kwds: Any) -> None:
     covers 폴더 하나에 너무 많은 커버 이미지 파일이 집중되는 것을 방지하기 위해서
     가능할 경우 각 라이브러리 폴더에 커버 이미지 파일을 분산
 
+    기존 폴더 구조:
+    covers/
+        text.png
+        _s1234554.jpg
+        v1234_c1234.jpg
+
+    분산 폴더 구조:
     covers/
         sub_path/
             101/
@@ -170,40 +177,42 @@ async def main(*args: Any, **kwds: Any) -> None:
                 v1234_c1234.jpg
         text.png
 
-    DB를 수정하는 작업이 포함되어 있기 때문에 반드시 kavita를 종료 후 실행
+    DB를 직접 수정해야 하기 때문에 Kavita 서버를 종료 후 실행
     covers 경로는 스크립트가 접근 가능한 경로
     대상 파일의 개수를 제한할 경우 quantity로 지정(-1 은 제한 없이 모든 파일)
     sub_path를 지정하면 covers/sub_path/101 등의 경로를 생성 후 이동
     지정하지 않으면 covers/101 등의 경로를 생성 후 이동
     로컬 경로와 리모트 경로(마운트)를 혼용해서 사용할 필요가 있으면 sub_path를 지정해서 마운트 포인트로 사용
     예) 새로 생성된 커버 파일은 기본 로컬 경로(covers)에 저장, 이후 스크립트로 정리하면서 리모트(sub_path)로 이동"""
-    #kavita.organize_covers('/mnt/cloud/kavita/covers', quantity=10, sub_path='sub_path', dry_run=True)
+    #kavita.organize_covers('/kavita/config/covers', quantity=10, sub_path='sub_path', dry_run=True)
 
     """
     Kavita 커버 파일은 이동 되었는데 DB 업데이트가 안됐을 경우 실행
-    DB의 CoverImage 값 중 SQL LIKE 형식이 `cover_image_like`이면 '{sub_path}/{library_id}/{cover_image}' 형식으로 업데이트
+    DB를 직접 수정해야 하기 때문에 Kavita 서버를 종료 후 실행
+    DB의 CoverImage 값 중 SQL LIKE 형식이 `cover_image_like`에 해당하면 '{sub_path}/{library_id}/{cover_image}' 형식으로 업데이트
     라이브러리 ID를 여러 개 입력"""
-    #kavita.fix_organized_covers([101, 102], '/mnt/cloud/kavita/covers', sub_path='sub_path', cover_image_like='%.png', dry_run=True)
+    #kavita.fix_organized_covers([101, 102], '/kavita/config/covers', sub_path='sub_path', cover_image_like='%.png', dry_run=True)
 
     """
     Kavita 커버 파일 분산 복구
     각 라이브러리 폴더의 파일을 다시 covers 폴더로 이동 후 DB 업데이트
+    DB를 직접 수정해야 하기 때문에 Kavita 서버를 종료 후 실행
     covers 경로는 스크립트가 접근 가능한 경로
     라이브러리 ID를 여러 개 지정"""
-    #kavita.undo_organized_covers([101], '/mnt/cloud/kavita/covers')
+    #kavita.undo_organized_covers([101], '/kavita/config/covers')
 
     """
     Kavita 커버 파일 정리
     covers 경로의 파일이 DB에서 사용되지 않을 경우 삭제
     특정 폴더들만 정리할 경우 subs로 지정
     covers 경로는 스크립트가 접근 가능한 경로"""
-    #kavita.clean_covers('/mnt/cloud/kavita/covers', subs=['101', '102'], recursive=False,dry_run=False)
+    #kavita.clean_covers('/kavita/config/covers', subs=['sub_path/101', 'sub_path/102'], recursive=False, dry_run=False)
 
     """
     Kavita 폴더 스캔
     해당 폴더를 포함하는 라이브러리를 스캔
     대상 폴더는 카비타에서 접근 가능한 경로"""
-    #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가')
+    #await kavita.scan_folder('/mnt/gds2/GDRIVE/READING/책/일반/가', url='http://kavita:5000', apikey='abcdefg')
 
     """
     Kavita 시리즈 스캔
@@ -214,30 +223,34 @@ async def main(*args: Any, **kwds: Any) -> None:
     Kavita 경로로 시리즈 스캔
     이미 존재하는 하나의 시리즈만 검색 되도록 경로를 지정
     대상 폴더는 카비타에서 접근 가능한 경로"""
-    #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False)
+    #await kavita.scan_series_by_path('/mnt/gds2/GDRIVE/READING/만화/연재/아/열혈강호/01권#199.zip', is_dir=False, force=False, colorscape=False, url='http://kavita:5000', apikey='abcdefg')
 
     """
     Kavita 쿼리로 시리즈 스캔
     쿼리문으로 검색되는 시리즈를 모두 스캔
     스캔 도중 다른 스캔을 요청하면 10분 딜레이 되기 때문에 각 시리즈 간 스캔 간격(interval)을 충분히 두고 실행
     시리즈의 스캔 완료 여부는 정확하게 판단할 수 없으므로 대략 1분 정도로 설정"""
-    #await kavita.scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60)
+    #await kavita.scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60, check=6, force=True)
 
     """
     Kavita 모든 라이브러리를 스캔"""
-    #await kavita.scan_all()
+    #await kavita.scan_all(force=False, url='http://kavita:5000', apikey='abcdefg')
 
     """
     Kavita 특정 라이브러리만 스캔"""
-    #await kavita.scan(103, force=True)
+    #await kavita.scan(103, force=True, url='http://kavita:5000', apikey='abcdefg')
 
     """
-    Kavita DB의 커버 파일 경로가 존재하지 않으면 스캔
-    covers 폴더 경로는 스크립트가 접근 가능한 경로
-    라이브러리 id를 지정하여 실행"""
-    #await kavita.scan_no_cover(110, '/mnt/cloud/teldrive/kavita/covers')
+    Kavita 시리즈 새로고침"""
+    #await kavita.series_refresh_metadata(library_id=103, series_id=12345, force=True, color_scape=False, url='http://kavita:5000', apikey='abcdefg')
+
+    """
+    Kavita 시리즈 및 볼륨의 커버 이미지가 비정상인 경우 Refresh Covers 실행
+    DB를 직접 업데이트하는 작업이 아니기 때문에 Kavita 서버가 라이브일 때 실행"""
+    #await kavita.refresh_no_cover(110) # 특정 라이브러리
+    #await kavita.refresh_no_cover() # 전체 라이브러리
     #for lib_id in range(111, 130):
-    #    await kavita.scan_no_cover(lib_id, '/mnt/cloud/teldrive/kavita/covers')
+    #    await kavita.refresh_no_cover(lib_id, semaphore=5, dry_run=True, url='http://kavita:5000', apikey='abcdefg')
 
     """
     Kavita DB 쿼리 실행"""

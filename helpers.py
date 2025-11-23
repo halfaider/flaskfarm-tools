@@ -192,6 +192,15 @@ class RedactedFormatter(logging.Formatter):
         return pattern.sub(self.substitute, text)
 
 
+shared_session: aiohttp.ClientSession | None = None
+def get_shared_session(default_headers: dict | None = None, timeout: int = 30, limit: int = 100, limit_per_host: int = 0) -> aiohttp.ClientSession:
+    global shared_session
+    if shared_session is None or shared_session.closed:
+        conn = aiohttp.TCPConnector(limit=limit, limit_per_host=limit_per_host)
+        shared_session = aiohttp.ClientSession(headers=default_headers, timeout=aiohttp.ClientTimeout(total=timeout), connector=conn)
+    return shared_session
+
+
 def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
     def decorator(func: Callable) -> Coroutine:
         @functools.wraps(func)
@@ -204,25 +213,41 @@ def http_api(default_headers: dict = None, timeout: int = 30) -> Callable:
             auth: tuple = api.get('auth')
             url: str = api.get('url')
             method: str = api.get('method')
+            read_body: bool = api.get('read_body', True)
             result = {
                 'status_code': 0,
                 'text': '',
                 'exception': '',
                 'json': {},
                 'url': '',
+                'content': b'',
+                'charset': None,
+                'content_type': '',
             }
-            async with aiohttp.ClientSession(headers=default_headers, timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-                try:
-                    async with session.request(method, url, params=params, json=json_, data=data, auth=auth, headers=headers) as response:
-                        result['status_code'] = response.status
-                        result['url'] = response.url
-                        if response.content:
-                            result['text'] = await response.text()
-                        if response.content and (response.content_type or '').lower() == 'application/json':
-                            result['json'] = await response.json()
-                except Exception as e:
-                    logger.warning(repr(e))
-                    result['exception'] = str(e)
+            session = get_shared_session(default_headers, timeout=timeout)
+            try:
+                async with session.request(method, url, params=params, json=json_, data=data, auth=auth, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+                    result['status_code'] = response.status
+                    result['url'] = str(response.url)
+                    c_type = (response.content_type or '').lower()
+                    result['content_type'] = c_type
+                    result['charset'] = response.charset
+                    if c_type == 'application/json':
+                        result['json'] = await response.json()
+                    elif c_type.startswith('text/') or c_type in (
+                        'application/xml',
+                        'application/xhtml+xml',
+                        'application/javascript',
+                        'application/ecmascript',
+                        'application/x-www-form-urlencoded',
+                    ):
+                        # text 계열이면 text() 호출
+                        result['text'] = await response.text()
+                    elif read_body:
+                        result['content'] = await response.read()
+            except Exception as e:
+                logger.exception(str(e))
+                result['exception'] = str(e)
             return result
         return wrapper
     return decorator

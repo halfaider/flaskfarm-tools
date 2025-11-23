@@ -6,30 +6,32 @@ import pathlib
 import datetime
 import urllib.parse
 import shutil
-from typing import Any, Generator, Sequence
+from typing import Any, Generator, Sequence, Callable
 
 from config import kavita as config
 from helpers import http_api, retrieve_db, string_bool
 
 logger = logging.getLogger(__name__)
-http_api = http_api(config.headers)
 retrieve_db = retrieve_db(config.db)
 
+kavita_token = None
 
 async def get_headers(require_token: bool = True, url: str = config.url, apikey: str = config.apikey) -> dict | None:
+    global kavita_token
     headers = {
         "Content-Type": "application/json"
     }
-    if require_token:
+    if require_token and kavita_token is None:
         result = await plugin_authenticate(url=url, apikey=apikey)
         if not 300 > (result.get('status_code') or 0) > 199:
             logger.error(f'인증 실패: {result}')
-        token = result.get('json').get('token')
-        headers['Authorization'] = f"Bearer {token}"
+        else:
+            kavita_token = result.get('json').get('token')
+    headers['Authorization'] = f"Bearer {kavita_token}"
     return headers
 
 
-@http_api
+@http_api(config.headers)
 async def plugin_authenticate(url: str = config.url, apikey: str = config.apikey, plugin_name: str = config.plugin_name) -> dict:
     return {
         'url': urllib.parse.urljoin(url, '/api/Plugin/authenticate'),
@@ -38,7 +40,7 @@ async def plugin_authenticate(url: str = config.url, apikey: str = config.apikey
     }
 
 
-@http_api
+@http_api(config.headers)
 async def scan_folder(folder: str, url: str = config.url, apikey: str = config.apikey) -> dict:
     return {
         'url': urllib.parse.urljoin(url, '/api/Library/scan-folder'),
@@ -47,7 +49,7 @@ async def scan_folder(folder: str, url: str = config.url, apikey: str = config.a
     }
 
 
-@http_api
+@http_api(config.headers)
 async def scan(library_id: int | str, force: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
     return {
         'url': urllib.parse.urljoin(url, '/api/Library/scan'),
@@ -57,7 +59,7 @@ async def scan(library_id: int | str, force: bool = False, url: str = config.url
     }
 
 
-@http_api
+@http_api(config.headers)
 async def scan_all(force: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
     return {
         'url': urllib.parse.urljoin(url, '/api/Library/scan-all'),
@@ -67,7 +69,7 @@ async def scan_all(force: bool = False, url: str = config.url, apikey: str = con
     }
 
 
-@http_api
+@http_api(config.headers)
 async def scan_series(series_id: int, library_id: int = -1, force: bool = False, colorscape: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
     if library_id < 1:
         row = fetch_one('SELECT LibraryId FROM Series WHERE id = ?', (series_id,))
@@ -92,7 +94,7 @@ async def scan_series_by_path(path: str, is_dir: bool = False, force: bool = Fal
     await scan_series(rows[0]['Id'], library_id=rows[0]['LibraryId'], force=force, colorscape=colorscape, url=url, apikey=apikey)
 
 
-@http_api
+@http_api(config.headers)
 async def scan_multiple(library_ids: Sequence[int | str], force: bool = False, url: str = config.url, apikey: str = config.apikey) -> dict:
     # 작동 안 하는 듯
     return {
@@ -103,12 +105,47 @@ async def scan_multiple(library_ids: Sequence[int | str], force: bool = False, u
     }
 
 
-@http_api
+@http_api(config.headers)
 async def jobs(url: str = config.url, apikey: str = config.apikey) -> dict:
     return {
         'url': urllib.parse.urljoin(url, '/api/Server/jobs'),
         'method': 'GET',
         'headers': await get_headers(url=url, apikey=apikey)
+    }
+
+
+@http_api(config.headers, 5)
+async def series_cover(series_id: int, method: str = 'GET', url: str = config.url, apikey: str = config.apikey, read_body: bool = False) -> dict:
+    return {
+        'url': urllib.parse.urljoin(url, '/api/image/series-cover'),
+        'method': method,
+        'params': {'seriesId': series_id, 'apiKey': apikey},
+        'read_body': read_body,
+    }
+
+
+@http_api(config.headers, 5)
+async def volume_cover(volume_id: int, method: str = 'GET', url: str = config.url, apikey: str = config.apikey, read_body: bool = False) -> dict:
+    return {
+        'url': urllib.parse.urljoin(url, '/api/image/volume-cover'),
+        'method': method,
+        'params': {'volumeId': volume_id, 'apiKey': apikey},
+        'read_body': read_body,
+    }
+
+
+@http_api(config.headers)
+async def series_refresh_metadata(library_id: int, series_id: int, force: bool = False, color_scape: bool = False, method: str = 'POST', url: str = config.url, apikey: str = config.apikey) -> dict:
+    return {
+        'url': urllib.parse.urljoin(url, '/api/Series/refresh-metadata'),
+        'method': method,
+        'headers': await get_headers(url=url, apikey=apikey),
+        'json': {
+            'libraryId': library_id,
+            'seriesId': series_id,
+            'forceUpdate': force,
+            'forceColorscape': color_scape,
+        },
     }
 
 
@@ -231,14 +268,14 @@ def organize_covers(covers: str = '/kavita/config/covers', quantity: int = -1, s
         covers: 커버 폴더 경로
         quantity: 옮길 파일 갯수를 정해서 부분 실행. 모든 파일: -1
         sub_path: 이동할 하위 폴더 이름. covers 폴더 아래에 생성
-        dry_run: 실제 실행 여부
+        dry_run: 실제 실행 여부. config.yaml 설정을 기본값으로 사용
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
 
     Examples:
-        >>> organize_covers('/docker/volumes/kavita/config/covers', dry_run=True)
+        >>> organize_covers('/kavita/config/covers', quantity=100, sub_path='google', dry_run=True)
     """
     path_covers = pathlib.Path(covers)
     fails = []
@@ -294,11 +331,11 @@ def fix_organized_covers(library_ids: Sequence[int] | str = (), covers: str = '/
     cover_image_like에 SQL LIKE 패턴을 지정하여 해당 되는 레코드만 업데이트
 
     Args:
-        library_ids: 라이브러리 ID
+        library_ids: 라이브러리 ID 리스트
         covers: 커버 폴더 경로
         sub_path: 커버 폴더 내 하위 폴더 이름
         cover_image_like: DB에 저장된 커버 파일 이름의 패턴(SQL LIKE)
-        dry_run: 실제 실행 여부
+        dry_run: 실제 실행 여부. config.yaml의 값을 기본값으로 사용
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
@@ -348,14 +385,14 @@ def clean_covers(covers: str = '/kavita/config/covers', subs: Sequence[str] = ()
         covers: 커버 폴더 경로
         sub: covers의 하위 폴더 이름. 특정 폴더만 정리하고 싶을 경우 지정
         recursive: 하위 폴더 탐색 여부
-        dry_run: 실제 실행 여부
+        dry_run: 실제 실행 여부. config.yaml의 값을 기본값으로 사용
         con: sqlite3 커넥션. 데코레이터에 의해 자동 입력
 
     Returns:
         None:
 
     Examples:
-        >>> clean_covers('/docker/volumes/kavita/config/covers', subs='101', recursive=False, dry_run=True)
+        >>> clean_covers('/docker/volumes/kavita/config/covers', subs=['sub_path/101'], recursive=False, dry_run=True)
     """
     root_path = pathlib.Path(covers)
     target_paths = []
@@ -401,24 +438,25 @@ def is_updated(series_id: int, start: float) -> bool:
     return max(last_modified, last_scanned) > start
 
 
-async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str] = (), interval: int | float = 30.0, check: int | float = 5.0) -> None:
+async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str] = (), interval: int | float = 30.0, check: int | float = 5.0, force: bool = False) -> None:
     """쿼리문으로 시리즈 스캔
     Args:
         query: 쿼리문
         params: 쿼리문 매개변수
         interval: 각 시리즈 스캔 간격 (초)
-        wait: 업데이트 확인 대기 시간 (초)
+        check: 업데이트 확인 대기 시간 (초)
+        force: 강제 업데이트 여부
     Returns:
         None:
     Examples:
-        >>> scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60)
+        >>> scan_series_by_query('SELECT * FROM Series WHERE CoverImage NOT LIKE ?', ('12345/%',), interval=60, check=6, force=True)
     """
     targets = tuple(fetch_all(query, params))
     last_index = len(targets) - 1
     for idx, row in enumerate(targets):
         start = datetime.datetime.now(datetime.timezone.utc).timestamp()
         logger.info(f'Scan: {row["Id"]}')
-        await scan_series(row['Id'], library_id=row['LibraryId'])
+        await scan_series(row['Id'], library_id=row['LibraryId'], force=force)
         while not is_updated(row['Id'], start):
             logger.debug(f'Waiting for update: {row["Id"]}')
             await asyncio.sleep(check)
@@ -426,37 +464,110 @@ async def scan_series_by_query(query: str, params: Sequence[str] | dict[str, str
             await asyncio.sleep(interval)
 
 
-async def scan_no_cover(library_id: int, covers: str = '/kavita/config/covers') -> None:
-    """DB에 입력된 커버 이미지가 존재하지 않을 경우 업데이트
+async def refresh_series(library_id: int, series_id: int, method: str = 'POST', force: bool = False, color_scape: bool = False, url: str = config.url, apikey: str = config.apikey, check: int | float = 5.0,) -> None:
+    start = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    logger.info(f'시리즈 새로고침: {series_id}')
+    result = await series_refresh_metadata(library_id, series_id, method=method, force=force, color_scape=color_scape, url=url, apikey=apikey)
+    if 300 > result.get('status_code') > 199:
+        while not is_updated(series_id, start):
+            logger.debug(f'시리즈 새로고침 대기중: {series_id}')
+            await asyncio.sleep(check)
+    else:
+        logger.error(f'시리즈 새로고침 실패: {series_id=} status_code={result.get("status_code")}')
+
+
+async def series_refresh_worker(refresh_queue: asyncio.Queue, dry_run: bool = config.dry_run) -> None:
+    scanning = set()
+    scanned = set()
+
+    while True:
+        library_id, series_id = await refresh_queue.get()
+        logger.debug(f"남은 새로고침 수: {refresh_queue.qsize()}")
+        if series_id in scanning or series_id in scanned:
+            refresh_queue.task_done()
+            continue
+        scanning.add(series_id)
+        try:
+            if not dry_run:
+                await refresh_series(library_id, series_id, force=True, check=5)
+            scanned.add(series_id)
+        finally:
+            scanning.remove(series_id)
+            refresh_queue.task_done()
+
+
+async def check_cover_image(row: sqlite3.Row, refresh_queue: asyncio.Queue, url: str = config.url, apikey: str = config.apikey) -> None:
+    cover_image = row.get('CoverImage')
+    library_id = row['LibraryId']
+    series_id = row['Id']
+    is_normal = True
+
+    if cover_image:
+        result = await series_cover(series_id, read_body=False, url=url, apikey=apikey)
+        is_normal = True if 300 > result.get('status_code') > 199 else False
+    else:
+        is_normal = False
+
+    if is_normal:
+        for vol_row in fetch_all(f'SELECT Id, CoverImage, SeriesId FROM Volume WHERE SeriesId = ?', (series_id,)):
+            vol_cover_image = vol_row.get('CoverImage')
+            volume_id = vol_row['Id']
+
+            if vol_cover_image:
+                result = await volume_cover(volume_id, read_body=False, url=url, apikey=apikey)
+                is_normal = True if 300 > result.get('status_code') > 199 else False
+            else:
+                is_normal = False
+
+    if not is_normal:
+        logger.info(f"비정상 커버: {url}/library/{library_id}/series/{series_id}")
+        await refresh_queue.put((library_id, series_id))
+
+
+async def refresh_no_cover(library_id: int | None = None, semaphore: int = 10, dry_run: bool = config.dry_run, url: str = config.url, apikey: str = config.apikey) -> None:
+    """시리즈 및 볼륨의 커버 이미지가 비정상인 경우 해당 시리즈를 refresh 시도
+
     Args:
-        library_id: 라이브러리 ID
+        library_id: 라이브러리 ID. 지정하지 않으면 전체 라이브러리
         covers: 커버 폴더 경로
+        semaphore: 커버 이미지 검증 작업을 동시에 실행할 개수
+        dry_run: 실제 실행 여부. config.yaml의 값을 기본값으로 사용
+        url: 링크 표시용 카비타 URL. conifg.yaml의 값을 기본값으로 사용
+        apikey: 카비타 API 키. config.yaml의 값을 기본값으로 사용
     Returns:
         None:
     Examples:
-        >>> scan_no_cover(101, covers='/mnt/kavita/covers')
+        >>> refresh_no_cover(101, covers='/kavita/config/covers', semaphore=5, url='http://kavita:5000', apikey='abcdefg')
     """
-    series = set()
-    for row in fetch_all(f'SELECT Id, CoverImage FROM Series WHERE LibraryId = ?', (library_id,)):
-        if row['CoverImage']:
-            path = pathlib.Path(covers) / row['CoverImage']
-            if not path.exists():
-                logger.info(f'Series {row["Id"]}: {path}')
-                series.add(row['Id'])
-        else:
-            logger.info(f'Series {row["Id"]}: None')
-            series.add(row['Id'])
-        for vol_row in fetch_all(f'SELECT Id, CoverImage, SeriesId FROM Volume WHERE SeriesId = ?', (row['Id'],)):
-            if vol_row['CoverImage']:
-                vol_path = pathlib.Path(covers) / vol_row['CoverImage']
-                if not vol_path.exists():
-                    logger.info(f'Volume {vol_row["Id"]}: {vol_path}')
-                    series.add(vol_row['SeriesId'])
-            else:
-                logger.info(f'Volume {vol_row["Id"]}: None')
-                series.add(vol_row['SeriesId'])
-    placeholders = ','.join('?' * len(series))
-    await scan_series_by_query(f'SELECT * FROM Series WHERE Id IN ({placeholders})', tuple(series))
+    count_query = f'SELECT COUNT(*) AS count FROM Series'
+    series_query = f'SELECT Id, CoverImage, LibraryId FROM Series'
+    if library_id:
+        count_query += f' WHERE LibraryId = ?'
+        series_query += f' WHERE LibraryId = ?'
+    count = fetch_one(count_query, (library_id,) if library_id else ())
+    total = int(count['count'])
+    series = fetch_all(series_query, (library_id,)if library_id else ())
+    refresh_queue = asyncio.Queue()
+    semaphore = asyncio.Semaphore(semaphore)
+
+    done = 0
+    lock = asyncio.Lock()
+
+    async def wrapped_check(row):
+        nonlocal done
+        async with semaphore:
+            await check_cover_image(row, refresh_queue, url=url, apikey=apikey)
+            async with lock:
+                done += 1
+                #if done <= 100 or total - done <= 100 or done % 100 == 0:
+                #    logger.info(f"{done}/{total} checks completed ({done/total*100:.1f}%)")
+                logger.debug(f"{done}/{total} 확인 완료 ({done/total*100:.1f}%)")
+
+    scan_task = asyncio.create_task(series_refresh_worker(refresh_queue, dry_run=dry_run))
+    check_tasks = [wrapped_check(row) for row in series]
+    await asyncio.gather(*check_tasks)
+    await refresh_queue.join()
+    scan_task.cancel()
 
 
 async def main(*args: Any, **kwds: Any) -> None:
