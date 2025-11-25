@@ -489,9 +489,11 @@ async def series_scan_worker(scan_queue: asyncio.Queue, interval: int = 60, chec
         scanning.add(series_id)
         try:
             if not dry_run:
-                start = datetime.datetime.now(datetime.timezone.utc).timestamp()
+                #start = datetime.datetime.now(datetime.timezone.utc).timestamp()
                 logger.info(f'Scan: {series_id}')
                 result = await scan_series(series_id, library_id=library_id, force=True)
+                if not 300 > result.get('status_code') > 199:
+                    logger.error(f'시리즈 스캔 실패: {series_id=} status_code={result.get("status_code")}')
                 # 그냥 기다리지 말고 카비타가 알아서 처리하도록...
                 #while not is_series_updated(series_id, start):
                 #    logger.debug(f'Waiting for update: {series_id}')
@@ -571,7 +573,7 @@ async def scan_no_cover(library_id: int | None = None, semaphore: int = 10, dry_
                 #    logger.info(f"{done}/{total} checks completed ({done/total*100:.1f}%)")
                 logger.debug(f"{done}/{total} 확인 완료 ({done/total*100:.1f}%)")
 
-    scan_task = asyncio.create_task(series_scan_worker(scan_queue, interval=60, check=5,dry_run=dry_run))
+    scan_task = asyncio.create_task(series_scan_worker(scan_queue, interval=60, check=5, dry_run=dry_run))
     check_tasks = [wrapped_check(row) for row in series]
     await asyncio.gather(*check_tasks)
     await scan_queue.join()
